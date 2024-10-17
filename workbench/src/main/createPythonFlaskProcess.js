@@ -81,14 +81,13 @@ export function setupServerProcessHandlers(subprocess) {
   pidToSubprocess[subprocess.pid] = subprocess;
 }
 
-export async function createJupyterProcess(jupyterExe, notebookDir, _port = undefined) {
+export async function createJupyterProcess(notebookDir, _port = undefined) {
   let port = _port;
   if (port === undefined) {
     port = await getFreePort();
     logger.debug(`PORT ${port}`);
   }
-  logger.debug('creating jupyterlab server process');
-  logger.debug(jupyterExe);
+  logger.debug('creating voila server process');
 
   const mamba = settingsStore.get('mamba');
   const modelEnvPath = settingsStore.get('plugins.schistosomiasis.env');

@@ -81,7 +81,7 @@ export const createWindow = async () => {
   });
   splashScreen.loadURL(path.join(BASE_URL, 'splash.html'));
 
-  const [investExe, jupyterExe] = findInvestBinaries(ELECTRON_DEV_MODE);
+  const investExe = findInvestBinaries(ELECTRON_DEV_MODE);
   settingsStore.set('investExe', investExe);
   settingsStore.set('mamba', findMambaExecutable(ELECTRON_DEV_MODE));
   // No plugin server processes should persist between workbench sessions
@@ -120,7 +120,7 @@ export const createWindow = async () => {
   });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
-      menuTemplate(mainWindow, ELECTRON_DEV_MODE, i18n, jupyterExe)
+      menuTemplate(mainWindow, ELECTRON_DEV_MODE, i18n)
     )
   );
   mainWindow.loadURL(path.join(BASE_URL, 'index.html'));
@@ -158,7 +158,7 @@ export const createWindow = async () => {
   // have callbacks that won't work until the invest server is ready.
   setupContextMenu(mainWindow);
   setupDownloadHandlers(mainWindow);
-  setupJupyter(mainWindow, ELECTRON_DEV_MODE, jupyterExe)
+  setupJupyter(mainWindow, ELECTRON_DEV_MODE);
   setupInvestRunHandlers();
   setupLaunchPluginServerHandler();
   setupOpenLocalHtml(mainWindow, ELECTRON_DEV_MODE);

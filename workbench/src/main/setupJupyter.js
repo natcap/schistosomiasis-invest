@@ -44,17 +44,16 @@ function serveWorkspace(dir) {
   return http.createServer(app).listen(8080);
 }
 
-export default function setupJupyter(parentWindow, isDevMode, jupyterExe) {
+export default function setupJupyter(parentWindow, isDevMode) {
   ipcMain.on(
     ipcMainChannels.OPEN_JUPYTER, async (event, filepath) => {
       const httpServer = serveWorkspace(path.dirname(filepath));
-
       let labDir = `${process.resourcesPath}/notebooks`;
       if (isDevMode) { labDir = 'resources/notebooks'; }
-      const [subprocess, port] = await createJupyterProcess(jupyterExe, labDir);
+      const [subprocess, port] = await createJupyterProcess(labDir);
       const child = createWindow(parentWindow, isDevMode);
       child.loadURL(`http://localhost:${port}/?token=${process.env.JUPYTER_TOKEN}`);
-      child.on('close', async (event) => {
+      child.on('close', async () => {
         await shutdownPythonProcess(subprocess.pid);
         httpServer.close();
       });
