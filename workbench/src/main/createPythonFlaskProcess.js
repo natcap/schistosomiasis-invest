@@ -81,7 +81,43 @@ export function setupServerProcessHandlers(subprocess) {
   pidToSubprocess[subprocess.pid] = subprocess;
 }
 
-export async function createJupyterProcess(notebookDir, _port = undefined) {
+/**
+ * Find out if the Jupyter server is online, waiting until it is.
+ * @param {number} port - the port where the jupyter server is running
+ * @param {number} i - the number or previous tries
+ * @param {number} retries - number of recursive calls this function is allowed.
+ * @returns { Promise } resolves text indicating success.
+ */
+export async function getJupyterIsReady(port, { i = 0, retries = 41 } = {}) {
+  try {
+    logger.debug(`${HOSTNAME}:${port}/?token=${process.env.JUPYTER_TOKEN}`);
+    await fetch(`${HOSTNAME}:${port}`, {
+      method: 'get',
+    });
+  } catch (error) {
+    if (error.code === 'ECONNREFUSED') {
+      while (i < retries) {
+        i++;
+        // Try every X ms, usually takes a couple seconds to startup.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        logger.debug(`retry # ${i}`);
+        return getJupyterIsReady(port, { i: i, retries: retries });
+      }
+      logger.error(`Not able to connect to server after ${retries} tries.`);
+    }
+    logger.error(error);
+    throw error;
+  }
+}
+
+/**
+ * Launch the voila server running a jupyter notebook for a given plugin.
+ * @param {string} pluginID - id of the plugin
+ * @param {number} _port - port to launch the voila server. If undefined,
+ *                       an available port will be chosen.
+ * @returns {Array} [subprocess, port]
+ */
+export async function createJupyterProcess(pluginID, _port = undefined) {
   let port = _port;
   if (port === undefined) {
     port = await getFreePort();
@@ -90,20 +126,21 @@ export async function createJupyterProcess(notebookDir, _port = undefined) {
   logger.debug('creating voila server process');
 
   const mamba = settingsStore.get('mamba');
-  const modelEnvPath = settingsStore.get('plugins.schistosomiasis.env');
+  const modelEnvPath = settingsStore.get(`plugins.${pluginID}.env`);
+  const relativeNotebookPath = settingsStore.get(`plugins.${pluginID}.notebook_path`);
 
+  // Extract the location of the installed plugin from `pip show`
+  // The notebook should be available there as package data
   const pipShow = execSync(
-    `mamba run --prefix "${modelEnvPath}" pip show schistosomiasis`,
+    `mamba run --prefix "${modelEnvPath}" pip show ${pluginID}`,
     { windowsHide: true }
   ).toString();
-  logger.info(pipShow);
   const pluginLocation = pipShow.match(/Location: (.+)/)[1];
-  logger.info('location', pluginLocation);
-  const notebookPath = `${pluginLocation}/notebooks/ipyleaflet.ipynb`;
+  const notebookPath = `${pluginLocation}/${relativeNotebookPath}`;
 
   const args = [
     'run', '--prefix', `"${modelEnvPath}"`,
-    'voila', notebookPath, '--debug', '--no-browser', '--port', port
+    'voila', notebookPath, '--debug', '--no-browser', '--port', port,
   ];
   logger.debug('spawning command:', mamba, args);
 
@@ -201,34 +238,6 @@ export async function createPluginServerProcess(modelName, _port = undefined) {
   await getFlaskIsReady(port, 0, 500);
   logger.info('flask is ready');
   return pythonServerProcess.pid;
-}
-
-/** Find out if the Jupyter server is online, waiting until it is.
- *
- * @param {number} i - the number or previous tries
- * @param {number} retries - number of recursive calls this function is allowed.
- * @returns { Promise } resolves text indicating success.
- */
-export async function getJupyterIsReady(port = undefined, { i = 0, retries = 41 } = {}) {
-  try {
-    logger.debug(`${HOSTNAME}:${port}/?token=${process.env.JUPYTER_TOKEN}`)
-    await fetch(`${HOSTNAME}:${port}`, {
-      method: 'get',
-    });
-  } catch (error) {
-    if (error.code === 'ECONNREFUSED') {
-      while (i < retries) {
-        i++;
-        // Try every X ms, usually takes a couple seconds to startup.
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        logger.debug(`retry # ${i}`);
-        return getJupyterIsReady(port, { i: i, retries: retries });
-      }
-      logger.error(`Not able to connect to server after ${retries} tries.`);
-    }
-    logger.error(error);
-    throw error;
-  }
 }
 
 /**
