@@ -26,9 +26,9 @@ function handleOpenWorkspace(logfile) {
   ipcRenderer.send(ipcMainChannels.SHOW_ITEM_IN_FOLDER, logfile);
 }
 
-function handleViewResults(logfile) {
-  console.log('View Results')
-  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile);
+function handleViewResults(logfile, pluginID) {
+  console.log('View Results');
+  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, pluginID);
 }
 
 /**
@@ -278,7 +278,7 @@ class InvestTab extends React.Component {
                     <ModelStatusAlert
                       status={status}
                       handleOpenWorkspace={() => handleOpenWorkspace(logfile)}
-                      handleViewResults={() => handleViewResults(logfile)}
+                      handleViewResults={() => handleViewResults(logfile, modelSpec.model_id)}
                       terminateInvestProcess={this.terminateInvestProcess}
                     />
                   )
