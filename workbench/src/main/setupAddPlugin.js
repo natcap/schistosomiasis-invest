@@ -38,8 +38,14 @@ export default function setupAddPlugin() {
         // Create a conda env containing the plugin and its dependencies
         const envName = `invest_plugin_${pluginID}`;
         const mamba = settingsStore.get('mamba');
+        let depString = '';
+        if (pyprojectTOML.conda_dependencies) {
+          depString = pyprojectTOML.conda_dependencies.map(
+            (dependency) => `"${dependency}"`
+          ).join(' ');
+        }
         execSync(
-          `${mamba} create --yes --name ${envName} -c conda-forge "python<3.12" "gdal<3.6"`,
+          `${mamba} create --yes --name ${envName} -c conda-forge ${depString}`,
           { stdio: 'inherit', windowsHide: true }
         );
         logger.info('created mamba env for plugin');
