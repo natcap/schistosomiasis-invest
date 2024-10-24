@@ -115,6 +115,7 @@ export function setupInvestRunHandlers() {
       cmdArgs = [
         'run',
         `--prefix ${settingsStore.get(`plugins.${modelRunName}.env`)}`,
+        '--live-stream',
         'invest',
         LOGLEVELMAP[loggingLevel],
         TGLOGLEVELMAP[taskgraphLoggingLevel],
