@@ -39,8 +39,8 @@ export function setupAddPlugin() {
         const envName = `invest_plugin_${pluginID}`;
         const mamba = settingsStore.get('mamba');
         let depString = '';
-        if (pyprojectTOML.conda_dependencies) {
-          depString = pyprojectTOML.conda_dependencies.map(
+        if (pyprojectTOML.tool.natcap.invest.conda_dependencies) {
+          depString = pyprojectTOML.tool.natcap.invest.conda_dependencies.map(
             (dependency) => `"${dependency}"`
           ).join(' ');
         }
