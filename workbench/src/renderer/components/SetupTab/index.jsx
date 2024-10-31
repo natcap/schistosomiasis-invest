@@ -46,25 +46,19 @@ const { logger } = window.Workbench;
  *       args of type 'option_string'.
  */
 function initializeArgValues(argsSpec, uiSpec, argsDict) {
-  console.log('argsvalues');
   const initIsEmpty = Object.keys(argsDict).length === 0;
   const argsValues = {};
   const argsDropdownOptions = {};
-  console.log(argsSpec);
   const argkeys = [];
+  // Custom handling of inputs for Schisto Plugin
   uiSpec.order.flat().forEach((group) => {
-    console.log(group);
     if (typeof group === 'string') {
-      console.log('string')
       argkeys.push(group);
     } else {
-      console.log('object')
       argkeys.push(...Object.values(group)[0]);
     }
   });
-  console.log(argkeys);
   argkeys.forEach((argkey) => {
-    console.log(argkey);
     // When initializing with undefined values, assign defaults so that,
     // a) values are handled well by the html inputs and
     // b) the object exported to JSON on "Save" or "Execute" includes defaults.
@@ -82,8 +76,6 @@ function initializeArgValues(argsSpec, uiSpec, argsDict) {
         }
       }
       argsDropdownOptions[argkey] = argsSpec[argkey].options;
-    // } else if (uiSpec.form_tables.includes(argkey)) {
-    //   value = {};
     } else {
       value = argsDict[argkey] || '';
     }
@@ -355,7 +347,6 @@ class SetupTab extends React.Component {
    * @returns {undefined}
    */
   updateArgTouched(key) {
-    console.log('update touched', key);
     const { argsValues } = this.state;
     if (!argsValues[key].touched) {
       argsValues[key].touched = true;
@@ -378,7 +369,6 @@ class SetupTab extends React.Component {
   updateArgValues(key, value) {
     const { uiSpec } = this.props;
     const { argsValues } = this.state;
-    console.log(argsValues, key);
     argsValues[key].value = value;
     this.setState({
       argsValues: argsValues,
@@ -616,7 +606,6 @@ class SetupTab extends React.Component {
           <Row>
             <ArgsForm
               argsSpec={argsSpec}
-              uiSpec={uiSpec}
               argsValues={argsValues}
               argsValidation={argsValidation}
               argsEnabled={argsEnabled}

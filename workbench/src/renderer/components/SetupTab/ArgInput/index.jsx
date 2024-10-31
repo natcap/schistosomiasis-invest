@@ -287,7 +287,7 @@ export function ArgInput(props) {
         }
       </Form.Control>
     );
-  } else if (argSpec.type === 'csv' && formTable) {
+  } else if (argSpec.type === 'csv' && formTable) { // custom for Schisto plugin
     const rows = [];
     Object.entries(argSpec.columns).forEach(([key, spec]) => {
       rows.push(
@@ -479,6 +479,7 @@ AboutModal.propTypes = {
   argkey: PropTypes.string.isRequired,
 };
 
+// Custom functionality for the Schisto plugin.
 export function FormTableInput(props) {
   const {
     argkeys,
@@ -503,6 +504,7 @@ export function FormTableInput(props) {
 
   const { t } = useTranslation();
 
+  // Custom functionality for Schisto plugin
   const initFormTableValues = {};
   if (formTable) {
     Object.keys(argSpec.columns).forEach((colName) => {
