@@ -38,25 +38,28 @@ export function setupAddPlugin() {
         // Create a conda env containing the plugin and its dependencies
         const envName = `invest_plugin_${pluginID}`;
         const mamba = settingsStore.get('mamba');
+      	logger.info(`mamba cmd: ${mamba}`);
         let depString = '';
         if (pyprojectTOML.tool.natcap.invest.conda_dependencies) {
           depString = pyprojectTOML.tool.natcap.invest.conda_dependencies.map(
             (dependency) => `"${dependency}"`
           ).join(' ');
         }
-        execSync(
-          `"${mamba}" create --yes --name ${envName} -c conda-forge ${depString}`,
-          { stdio: 'inherit', windowsHide: true }
-        );
+        const createInfo = execSync(
+          `${mamba} create --yes --name ${envName} -c conda-forge ${depString}`,
+          //{ stdio: 'inherit', windowsHide: true }
+          { windowsHide: true }
+        ).toString();
+        logger.info(`create info:\n${createInfo}`);
         logger.info('created mamba env for plugin');
         execSync(
-          `"${mamba}" run --name ${envName} pip install "git+${pluginURL}"`,
+          `${mamba} run --name ${envName} pip install "git+${pluginURL}"`,
           { stdio: 'inherit', windowsHide: true }
         );
         logger.info('installed plugin into its env');
 
         // Write plugin metadata to the workbench's config.json
-        const envInfo = execSync(`"${mamba}" info --envs`, { windowsHide: true }).toString();
+        const envInfo = execSync(`${mamba} info --envs`, { windowsHide: true }).toString();
         logger.info(`env info:\n${envInfo}`);
         const regex = new RegExp(String.raw`^${envName} +(.+)$`, 'm');
         const envPath = envInfo.match(regex)[1];
@@ -75,6 +78,8 @@ export function setupAddPlugin() {
         );
         logger.info('successfully added plugin');
       } catch (error) {
+        logger.info(`error:\n${error}`);
+        logger.info(`stdError:\n${error.stderr.toString()}`);
         return error;
       }
     }
@@ -90,8 +95,9 @@ export function setupRemovePlugin() {
         // Delete the plugin's conda env
         const env = settingsStore.get(`plugins.${pluginID}.env`);
         const mamba = settingsStore.get('mamba');
+      	logger.info('mamba cmd', mamba);
         execSync(
-          `"${mamba}" remove --yes --prefix ${env} --all`,
+          `${mamba} remove --yes --prefix ${env} --all`,
           { stdio: 'inherit', windowsHide: true  }
         );
         // Delete the plugin's data from storage
