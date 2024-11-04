@@ -45,18 +45,18 @@ export function setupAddPlugin() {
           ).join(' ');
         }
         execSync(
-          `${mamba} create --yes --name ${envName} -c conda-forge ${depString}`,
+          `"${mamba}" create --yes --name ${envName} -c conda-forge ${depString}`,
           { stdio: 'inherit', windowsHide: true }
         );
         logger.info('created mamba env for plugin');
         execSync(
-          `${mamba} run --name ${envName} pip install "git+${pluginURL}"`,
+          `"${mamba}" run --name ${envName} pip install "git+${pluginURL}"`,
           { stdio: 'inherit', windowsHide: true }
         );
         logger.info('installed plugin into its env');
 
         // Write plugin metadata to the workbench's config.json
-        const envInfo = execSync(`${mamba} info --envs`, { windowsHide: true }).toString();
+        const envInfo = execSync(`"${mamba}" info --envs`, { windowsHide: true }).toString();
         logger.info(`env info:\n${envInfo}`);
         const regex = new RegExp(String.raw`^${envName} +(.+)$`, 'm');
         const envPath = envInfo.match(regex)[1];
@@ -91,8 +91,8 @@ export function setupRemovePlugin() {
         const env = settingsStore.get(`plugins.${pluginID}.env`);
         const mamba = settingsStore.get('mamba');
         execSync(
-          `${mamba} remove --yes --prefix ${env} --all`,
-          { stdio: 'inherit' }
+          `"${mamba}" remove --yes --prefix ${env} --all`,
+          { stdio: 'inherit', windowsHide: true  }
         );
         // Delete the plugin's data from storage
         settingsStore.delete(`plugins.${pluginID}`);
