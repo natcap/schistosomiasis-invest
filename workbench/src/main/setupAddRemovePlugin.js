@@ -52,10 +52,12 @@ export function setupAddPlugin() {
         ).toString();
         logger.info(`create info:\n${createInfo}`);
         logger.info('created mamba env for plugin');
-        execSync(
+        const runInfo = execSync(
           `${mamba} run --name ${envName} pip install "git+${pluginURL}"`,
-          { stdio: 'inherit', windowsHide: true }
+          //{ stdio: 'inherit', windowsHide: true }
+          { windowsHide: true }
         );
+        logger.info(`run info:\n${runInfo}`);
         logger.info('installed plugin into its env');
 
         // Write plugin metadata to the workbench's config.json
