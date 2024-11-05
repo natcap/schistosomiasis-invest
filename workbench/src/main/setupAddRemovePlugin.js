@@ -45,7 +45,9 @@ export function setupAddPlugin() {
           ).join(' ');
         }
         execSync(
-          `${mamba} create --yes --name ${envName} -c conda-forge ${depString}`,
+          // Always install python, we'll need it to pip install the plugin. Plugins
+          // may restrict the version by setting a python requirement in pyproject.toml
+          `${mamba} create --yes --name ${envName} -c conda-forge python ${depString}`,
           { stdio: 'inherit', windowsHide: true }
         );
         logger.info('created mamba env for plugin');
