@@ -140,7 +140,7 @@ export async function createJupyterProcess(pluginID, _port = undefined) {
 
   const args = [
     'run', '--prefix', `"${modelEnvPath}"`,
-    'voila', notebookPath, '--debug', '--no-browser', '--port', port,
+    'voila', `"${notebookPath}"`, '--debug', '--no-browser', '--port', port,
   ];
   logger.debug('spawning command:', mamba, args);
 
