@@ -45,8 +45,11 @@ export function setupAddPlugin() {
             (dependency) => `"${dependency}"`
           ).join(' ');
         }
+
         const createInfo = execSync(
-          `${mamba} create --yes --name ${envName} -c conda-forge ${depString}`,
+          // Always install python, we'll need it to pip install the plugin. Plugins
+          // may restrict the version by setting a python requirement in pyproject.toml
+          `${mamba} create --yes --name ${envName} -c conda-forge python ${depString}`,
           { windowsHide: true }).toString();
         logger.info(`Plugins: create info:\n${createInfo}`);
         logger.info('Plugins: created mamba env for plugin');
