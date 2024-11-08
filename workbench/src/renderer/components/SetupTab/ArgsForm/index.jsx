@@ -123,7 +123,6 @@ class ArgsForm extends React.Component {
       argsValidation,
       argsEnabled,
       argsDropdownOptions,
-      uiSpec,
       userguide,
       scrollEventCount,
     } = this.props;
@@ -132,9 +131,9 @@ class ArgsForm extends React.Component {
     argsOrder.forEach((groupArray) => {
       k += 1;
       const groupItems = [];
+      // FormTableInput was developed specifically for the Schisto Plugin project.
       groupArray.forEach((argkey) => {
         if (typeof argkey === 'object') {
-          console.log(argkey);
           const groupName = Object.keys(argkey)[0];
           const argkeys = argkey[groupName];
           groupItems.push(
@@ -142,7 +141,6 @@ class ArgsForm extends React.Component {
               argkeys={argkeys}
               argsSpec={argsSpec}
               groupName={groupName}
-              // formTable={uiSpec.form_tables.includes(argkey)}
               userguide={userguide}
               dropdownOptions={argsDropdownOptions[argkey]}
               argsEnabled={argsEnabled}
@@ -161,7 +159,6 @@ class ArgsForm extends React.Component {
             <ArgInput
               argkey={argkey}
               argSpec={argsSpec[argkey]}
-              // formTable={uiSpec.form_tables.includes(argkey)}
               userguide={userguide}
               dropdownOptions={argsDropdownOptions[argkey]}
               enabled={argsEnabled[argkey]}

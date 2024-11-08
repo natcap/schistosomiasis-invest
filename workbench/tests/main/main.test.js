@@ -193,6 +193,7 @@ describe('createWindow', () => {
       ipcMainChannels.OPEN_PATH,
       ipcMainChannels.SHOW_OPEN_DIALOG,
       ipcMainChannels.SHOW_SAVE_DIALOG,
+      ipcMainChannels.WRITE_CSV,
     ];
     const expectedOnChannels = [
       ipcMainChannels.DOWNLOAD_URL,
@@ -204,6 +205,7 @@ describe('createWindow', () => {
       ipcMainChannels.LOGGER,
       ipcMainChannels.SHOW_ITEM_IN_FOLDER,
       ipcMainChannels.OPEN_EXTERNAL_URL,
+      ipcMainChannels.OPEN_JUPYTER,
       ipcMainChannels.OPEN_LOCAL_HTML,
       ipcMainChannels.SET_SETTING,
     ];
