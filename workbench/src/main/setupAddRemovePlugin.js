@@ -98,8 +98,8 @@ export function setupRemovePlugin() {
         const mamba = settingsStore.get('mamba');
       	logger.info('Plugins: mamba cmd', mamba);
         execSync(
-          `${mamba} remove --yes --prefix ${env} --all`,
-          { stdio: 'inherit', windowsHide: true  }
+          `${mamba} remove --yes --prefix "${env}" --all`,
+          { stdio: 'inherit', windowsHide: true }
         );
         // Delete the plugin's data from storage
         settingsStore.delete(`plugins.${pluginID}`);
