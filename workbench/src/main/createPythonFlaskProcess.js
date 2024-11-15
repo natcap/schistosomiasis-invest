@@ -132,7 +132,7 @@ export async function createJupyterProcess(pluginID, _port = undefined) {
   // Extract the location of the installed plugin from `pip show`
   // The notebook should be available there as package data
   const pipShow = execSync(
-    `mamba run --prefix "${modelEnvPath}" pip show ${pluginID}`,
+    `${mamba} run --prefix "${modelEnvPath}" pip show ${pluginID}`,
     { windowsHide: true }
   ).toString();
   const pluginLocation = pipShow.match(/Location: (.+)/)[1];
