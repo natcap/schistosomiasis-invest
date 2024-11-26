@@ -228,11 +228,13 @@ class SetupTab extends React.Component {
   async saveDatastack(datastackPath) {
     const {
       pyModuleName,
+      modelId,
     } = this.props;
     const args = argsDictFromObject(this.state.argsValues);
     const payload = {
       filepath: datastackPath,
       moduleName: pyModuleName,
+      modelId: modelId,
       args: JSON.stringify(args),
     };
     const key = window.crypto.getRandomValues(new Uint16Array(1))[0].toString();
@@ -282,7 +284,7 @@ class SetupTab extends React.Component {
   }
 
   async loadParametersFromFile(filepath) {
-    const { pyModuleName, switchTabs, t } = this.props;
+    const { pyModuleName, modelId, switchTabs, t } = this.props;
     let datastack;
     try {
       if (filepath.endsWith('gz')) {  // .tar.gz, .tgz
@@ -292,13 +294,16 @@ class SetupTab extends React.Component {
         );
         if (extractLocation.filePath) {
           datastack = await fetchDatastackFromFile({
+            modelId: modelId,
             filepath: filepath,
             extractPath: extractLocation.filePath});
         } else {
           return;
         }
       } else {
-          datastack = await fetchDatastackFromFile({ filepath: filepath });
+          datastack = await fetchDatastackFromFile({
+            modelId: modelId,
+            filepath: filepath });
       }
     } catch (error) {
       logger.error(error);
