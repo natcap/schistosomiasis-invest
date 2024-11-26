@@ -19,8 +19,8 @@ function createWindow(parentWindow, isDevMode) {
   const devModeArg = isDevMode ? '--devMode' : '';
   const win = new BrowserWindow({
     parent: parentWindow,
-    width: 700,
-    height: 800,
+    width: 1200,
+    height: 900,
     frame: true,
     webPreferences: {
       minimumFontSize: 12,
