@@ -120,6 +120,7 @@ export async function fetchArgsEnabled(payload) {
  *
  * @param {object} payload {
  *   model_module: string (e.g. natcap.invest.carbon)
+ *   modelId: string (e.g. carbon)
  *   args: JSON string of InVEST model args keys and values
  * }
  * @returns {Promise} resolves array
@@ -146,11 +147,14 @@ export async function fetchValidation(payload) {
 /**
  * Load invest arguments from a datastack-compliant file.
  *
- * @param {string} payload - path to file
+ * @param  {object} payload {
+ *   filepath: string, path to file
+ *   modelId: string (e.g. carbon)
+ * }
  * @returns {Promise} resolves undefined
  */
 export async function fetchDatastackFromFile(payload) {
-  const port = await getCorePort();
+  const port = await getPort(payload.modelId);
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/post_datastack_file`, {
       method: 'post',
@@ -172,7 +176,7 @@ export async function fetchDatastackFromFile(payload) {
  * @returns {Promise} resolves undefined
  */
 export async function saveToPython(payload) {
-  const port = await getCorePort();
+  const port = await getPort(payload.modelname);
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/save_to_python`, {
       method: 'post',
@@ -194,12 +198,13 @@ export async function saveToPython(payload) {
  * @param  {object} payload {
  *   filepath: string
  *   moduleName: string (e.g. natcap.invest.carbon)
+ *   modelId: string (e.g. carbon)
  *   args_dict: JSON string of InVEST model args keys and values
  * }
  * @returns {Promise} resolves undefined
  */
 export async function archiveDatastack(payload) {
-  const port = await getCorePort();
+  const port = await getPort(payload.modelId);
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/build_datastack_archive`, {
       method: 'post',
