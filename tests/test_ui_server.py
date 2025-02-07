@@ -6,7 +6,9 @@ import unittest
 from unittest.mock import Mock, patch
 
 from natcap.invest import ui_server
+from osgeo import gdal
 
+gdal.UseExceptions()
 TEST_DATA_PATH = os.path.join(
     os.path.dirname(__file__), '..', 'data', 'invest-test-data')
 
@@ -37,7 +39,7 @@ class EndpointFunctionTests(unittest.TestCase):
     def test_get_invest_spec(self):
         """UI server: get_invest_spec endpoint."""
         test_client = ui_server.app.test_client()
-        response = test_client.post(f'{ROUTE_PREFIX}/getspec', json='sdr')
+        response = test_client.post(f'{ROUTE_PREFIX}/getspec', json='carbon')
         spec = json.loads(response.get_data(as_text=True))
         self.assertEqual(
             set(spec),

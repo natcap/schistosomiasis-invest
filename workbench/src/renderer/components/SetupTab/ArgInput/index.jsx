@@ -53,7 +53,7 @@ function FormLabel(props) {
     <Form.Label column sm="3" htmlFor={argkey}>
       <span className="argname">{argname} </span>
       {
-       (userFriendlyArgType || optional) && 
+       (userFriendlyArgType || optional) &&
         <span>
           (
             {userFriendlyArgType}

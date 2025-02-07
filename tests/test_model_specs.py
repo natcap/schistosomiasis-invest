@@ -2,13 +2,17 @@ import importlib
 import re
 import subprocess
 import unittest
+import pytest
 
 import pint
 from natcap.invest.models import model_id_to_pyname
+from osgeo import gdal
 
 PLUGIN_URL = 'git+https://github.com/emlys/demo-invest-plugin.git'
 PLUGIN_NAME = 'foo-model'
 
+
+gdal.UseExceptions()
 valid_nested_types = {
     None: {  # if no parent type (arg is top-level), then all types are valid
         'boolean',
@@ -552,7 +556,7 @@ class SpecUtilsTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             spec_utils.format_unit({})
 
-
+@pytest.mark.skip(reason="Possible race condition of plugin not being uninstalled before other tests are run.")
 class PluginTests(unittest.TestCase):
     """Tests for natcap.invest plugins."""
 

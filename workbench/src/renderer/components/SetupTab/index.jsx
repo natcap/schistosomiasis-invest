@@ -308,10 +308,7 @@ class SetupTab extends React.Component {
     } catch (error) {
       logger.error(error);
       alert( // eslint-disable-line no-alert
-        t(
-          'No InVEST model data can be parsed from the file:\n {{filepath}}',
-          { filepath: filepath }
-        )
+        `${t('No InVEST model data can be parsed from the file:')}\n${filepath}`
       );
       return;
     }

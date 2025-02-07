@@ -52,61 +52,90 @@ function spawnWithLogging(cmd, args, options) {
 export function setupAddPlugin() {
   ipcMain.handle(
     ipcMainChannels.ADD_PLUGIN,
-    async (e, pluginURL) => {
+    async (e, url, revision, path) => {
       try {
-        logger.info('adding plugin at', pluginURL);
-        const mamba = settingsStore.get('mamba');
-        // Create a temporary directory and check out the plugin's pyproject.toml
-        const tmpPluginDir = fs.mkdtempSync(upath.join(tmpdir(), 'natcap-invest-'));
-        await spawnWithLogging(
-          'git',
-          ['clone', '--depth', '1', '--no-checkout', pluginURL, tmpPluginDir]
-        );
-        await spawnWithLogging(
-          'git',
-          ['checkout', 'HEAD', 'pyproject.toml'],
-          { cwd: tmpPluginDir }
-        );
-        // Read in the plugin's pyproject.toml, then delete it
-        const pyprojectTOML = toml.parse(fs.readFileSync(
-          upath.join(tmpPluginDir, 'pyproject.toml')
-        ).toString());
-        fs.rmSync(tmpPluginDir, { recursive: true, force: true });
+        let pyprojectTOML;
+        let installString;
+        const micromamba = settingsStore.get('micromamba');
+        const rootPrefix = upath.join(process.resourcesPath, 'micromamba_envs');
+        if (url) { // install from git URL
+          if (revision) {
+            installString = `git+${url}@${revision}`;
+            logger.info(`adding plugin from ${installString}`);
+          } else {
+            installString = `git+${url}`;
+            logger.info(`adding plugin from ${installString} at default branch`);
+          }
+
+          const baseEnvPrefix = upath.join(rootPrefix, 'invest_base');
+          // Create invest_base environment, if it doesn't already exist
+          // The purpose of this environment is just to ensure that git is available
+          if (!fs.existsSync(baseEnvPrefix)) {
+            await spawnWithLogging(
+              micromamba,
+              ['create', '--yes', '--prefix', `"${baseEnvPrefix}"`, '-c', 'conda-forge', 'git']
+            );
+          }
+
+          // Create a temporary directory and check out the plugin's pyproject.toml,
+          // without downloading any extra files or git history
+          const tmpPluginDir = fs.mkdtempSync(upath.join(tmpdir(), 'natcap-invest-'));
+          await spawnWithLogging(
+            micromamba,
+            ['run', '--prefix', `"${baseEnvPrefix}"`,
+              'git', 'clone', '--depth', 1, '--no-checkout', url, tmpPluginDir]);
+          let head = 'HEAD';
+          if (revision) {
+            head = 'FETCH_HEAD';
+            await spawnWithLogging(
+              micromamba,
+              ['run', '--prefix', `"${baseEnvPrefix}"`, 'git', 'fetch', 'origin', `${revision}`],
+              { cwd: tmpPluginDir }
+            );
+          }
+          await spawnWithLogging(
+            micromamba,
+            ['run', '--prefix', `"${baseEnvPrefix}"`, 'git', 'checkout', head, '--', 'pyproject.toml'],
+            { cwd: tmpPluginDir }
+          );
+          // Read in the plugin's pyproject.toml, then delete it
+          pyprojectTOML = toml.parse(fs.readFileSync(
+            upath.join(tmpPluginDir, 'pyproject.toml')
+          ).toString());
+          fs.rmSync(tmpPluginDir, { recursive: true, force: true });
+        } else { // install from local path
+          logger.info(`adding plugin from ${path}`);
+          installString = path;
+          // Read in the plugin's pyproject.toml
+          pyprojectTOML = toml.parse(fs.readFileSync(
+            upath.join(path, 'pyproject.toml')
+          ).toString());
+        }
 
         // Access plugin metadata from the pyproject.toml
         const pluginID = pyprojectTOML.tool.natcap.invest.model_id;
         const pluginName = pyprojectTOML.tool.natcap.invest.model_name;
         const pluginPyName = pyprojectTOML.tool.natcap.invest.pyname;
+        const condaDeps = pyprojectTOML.tool.natcap.invest.conda_dependencies;
 
         // Create a conda env containing the plugin and its dependencies
         const envName = `invest_plugin_${pluginID}`;
-        let depString = '';
-        if (pyprojectTOML.tool.natcap.invest.conda_dependencies) {
-          depString = pyprojectTOML.tool.natcap.invest.conda_dependencies.map(
-            (dependency) => `"${dependency}"`
-          ).join(' ');
+        const pluginEnvPrefix = upath.join(rootPrefix, envName);
+        const createCommand = [
+          'create', '--yes', '--prefix', `"${pluginEnvPrefix}"`,
+          '-c', 'conda-forge', 'python'];
+        if (condaDeps) { // include dependencies read from pyproject.toml
+          condaDeps.forEach((dep) => createCommand.push(`"${dep}"`));
         }
-
-	// Always install python, we'll need it to pip install the plugin. Plugins
-	// may restrict the version by setting a python requirement in pyproject.toml
+        await spawnWithLogging(micromamba, createCommand);
+        logger.info('created micromamba env for plugin');
         await spawnWithLogging(
-          mamba,
-          ['create', '--yes', '--name', envName, '-c', 'conda-forge', 'python', depString]
-        );
-        logger.info('created mamba env for plugin');
-
-        await spawnWithLogging(
-          mamba,
-          ['run', '--verbose', '--no-capture-output', '--name', envName, 'pip', 'install', `git+${pluginURL}`]
+          micromamba,
+          ['run', '--prefix', `"${pluginEnvPrefix}"`, 'pip', 'install', installString]
         );
         logger.info('installed plugin into its env');
 
         // Write plugin metadata to the workbench's config.json
-        const envInfo = execSync(`${mamba} info --envs`, { windowsHide: true }).toString();
-        logger.info(`env info:\n${envInfo}`);
-        const regex = new RegExp(String.raw`^${envName} +(.+)$`, 'm');
-        const envPath = envInfo.match(regex)[1];
-        logger.info(`env path:\n${envPath}`);
         logger.info('writing plugin info to settings store');
         // Copy over all plugin metadata key/value pairs from the pyproject.toml
         // except for the model_id, because it's the top-level key
@@ -114,9 +143,11 @@ export function setupAddPlugin() {
         settingsStore.set(
           `plugins.${pluginID}`,
           {
-            ...pyprojectTOML.tool.natcap.invest,
-            source: pluginURL,
-            env: envPath,
+            model_name: pluginName,
+            pyname: pluginPyName,
+            type: 'plugin',
+            source: installString,
+            env: pluginEnvPrefix,
           }
         );
         logger.info('successfully added plugin');
@@ -135,8 +166,8 @@ export function setupRemovePlugin() {
       try {
         // Delete the plugin's conda env
         const env = settingsStore.get(`plugins.${pluginID}.env`);
-        const mamba = settingsStore.get('mamba');
-        await spawnWithLogging(mamba, ['remove', '--yes', '--prefix', `"${env}"`, '--all']);
+        const micromamba = settingsStore.get('micromamba');
+        await spawnWithLogging(micromamba, ['remove', '--yes', '--prefix', `"${env}"`, '--all']);
         // Delete the plugin's data from storage
         settingsStore.delete(`plugins.${pluginID}`);
         logger.info('successfully removed plugin');

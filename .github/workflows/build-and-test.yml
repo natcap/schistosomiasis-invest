@@ -342,8 +342,9 @@ jobs:
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv  # Choco-provided command to reload environment variables
 
-      - name: Build userguide
-        run: make userguide
+        # Ignoring compiled modules for plugin development
+        #- name: Build userguide
+        #run: make userguide
 
       - name: Build binaries
         run: make CONDA="$MAMBA_EXE" binaries
@@ -367,22 +368,21 @@ jobs:
           yarn config set network-timeout 600000 -g
           yarn install
 
-      - name: Download mamba installer for distribution (MacOS)
+      - name: Download micromamba for distribution (MacOS)
         if: matrix.os == 'macos-13'
-        run: curl -fsSLo Miniforge3-MacOSX-x86_64.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-x86_64.sh"
+        run: |
+          curl -Ls https://micro.mamba.pm/api/micromamba/osx-64/latest | tar -xvj bin/micromamba
+          mv bin/micromamba dist/
+          ./dist/micromamba --help  # make sure the executable works
 
-      - name: Install mamba for MacOS
-        if: matrix.os == 'macos-13'
-        run: bash Miniforge3-MacOSX-x86_64.sh -b -p dist/miniforge3
-
-      - name: Download mamba installer for distribution (Windows)
+      - name: Download micromamba for distribution (Windows)
         if: matrix.os == 'windows-latest'
-        run: curl -fsSLo Miniforge3-Windows-x86_64.exe "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Windows-x86_64.exe"
-
-      - name: Install mamba for Windows
-        if: matrix.os == 'windows-latest'
-        shell: cmd
-        run: Miniforge3-Windows-x86_64.exe /InstallationType=JustMe /RegisterPython=0 /S /D=%cd%\dist\miniforge3
+        shell: pwsh
+        run: |
+          Invoke-Webrequest -URI https://micro.mamba.pm/api/micromamba/win-64/latest -OutFile micromamba.tar.bz2
+          tar xf micromamba.tar.bz2
+          MOVE -Force Library\bin\micromamba.exe dist\micromamba.exe
+          .\dist\micromamba.exe --help  # make sure the executable works
 
       - name: Authenticate GCP
         if: github.event_name != 'pull_request'
@@ -466,12 +466,12 @@ jobs:
           name: Workbench-${{ runner.os }}-binary
           path: workbench/dist/*.${{ matrix.binary-extension }}
 
-      - name: Upload user's guide artifact (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: InVEST-user-guide
-          path: dist/InVEST_*_userguide.zip
+#      - name: Upload user's guide artifact (Windows)
+#        if: matrix.os == 'windows-latest'
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: InVEST-user-guide
+#          path: dist/InVEST_*_userguide.zip
 
       - name: Upload workbench logging from puppeteer
         uses: actions/upload-artifact@v4
