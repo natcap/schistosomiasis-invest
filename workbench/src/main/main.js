@@ -106,8 +106,6 @@ export const createWindow = async () => {
   setupInvestLogReaderHandler();
   setupOpenExternalUrl();
   setupRendererLogger();
-  setupAddPlugin();
-  setupRemovePlugin();
   setupBaseUrl();
 
   const devModeArg = ELECTRON_DEV_MODE ? '--devmode' : '';
@@ -164,6 +162,8 @@ export const createWindow = async () => {
   setupJupyter(mainWindow, ELECTRON_DEV_MODE);
   setupInvestRunHandlers();
   setupLaunchPluginServerHandler();
+  setupAddPlugin(i18n);
+  setupRemovePlugin();
   setupOpenLocalHtml(mainWindow, ELECTRON_DEV_MODE);
   if (ELECTRON_DEV_MODE) {
     // The timing of this is fussy due a chromium bug. It seems to only

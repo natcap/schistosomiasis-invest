@@ -9,7 +9,7 @@ import { ipcMainChannels } from '../../src/main/ipcMainChannels';
 import App from '../../src/renderer/app';
 import {
   getSpec,
-  getInvestModelNames,
+  getInvestModelIDs,
   fetchArgsEnabled,
   fetchValidation
 } from '../../src/renderer/server_requests';
@@ -19,8 +19,8 @@ jest.mock('../../src/renderer/server_requests');
 describe('Add plugin modal', () => {
   beforeEach(() => {
     getSpec.mockResolvedValue({
-      model_name: 'foo',
-      pyname: 'natcap.invest.foo',
+      model_id: 'foo',
+      model_title: 'Foo',
       userguide: '',
       args: {
         workspace_dir: {
@@ -44,7 +44,7 @@ describe('Add plugin modal', () => {
       input_path: true,
     });
     fetchValidation.mockResolvedValue([]);
-    getInvestModelNames.mockResolvedValue({});
+    getInvestModelIDs.mockResolvedValue({});
   });
 
   test('Interface to add a plugin', async () => {
@@ -53,7 +53,7 @@ describe('Add plugin modal', () => {
         if (setting === 'plugins') {
           return Promise.resolve({
             foo: {
-              model_name: 'Foo',
+              modelTitle: 'Foo',
               type: 'plugin',
             },
           });
@@ -73,13 +73,14 @@ describe('Add plugin modal', () => {
     const submitButton = await findByText('Add');
     userEvent.click(submitButton);
 
-    await findByText('Loading...');
-    const calledChannels = spy.mock.calls.map((call) => call[0]);
+    await findByText('Adding...');
     await waitFor(() => {
+      const calledChannels = spy.mock.calls.map((call) => call[0]);
       expect(calledChannels).toContain(ipcMainChannels.ADD_PLUGIN);
     });
-    // expect the plugin dialog to have disappeared
-    await waitFor(() => expect(queryByRole('dialog')).toBeNull());
+    // close the modal
+    const overlay = await findByRole('dialog');
+    await userEvent.click(overlay);
     const pluginButton = await findByRole('button', { name: /Foo/ });
     // assert that the 'plugin' badge is displayed
     await waitFor(() => expect(within(pluginButton).getByText('Plugin')).toBeInTheDocument());
@@ -91,7 +92,7 @@ describe('Add plugin modal', () => {
         if (setting === 'plugins') {
           return Promise.resolve({
             foo: {
-              model_name: 'Foo',
+              modelTitle: 'Foo',
               type: 'plugin',
             },
           });
@@ -117,7 +118,6 @@ describe('Add plugin modal', () => {
       expect(spy).toHaveBeenCalledWith(
         ipcMainChannels.INVEST_RUN,
         'foo',
-        'natcap.invest.foo',
         { input_path: '', workspace_dir: '' },
         expect.anything()
       );
@@ -127,7 +127,7 @@ describe('Add plugin modal', () => {
   test('Remove a plugin', async () => {
     let plugins = {
       foo: {
-        model_name: 'Foo',
+        modelTitle: 'Foo',
         type: 'plugin',
       },
     };
@@ -142,17 +142,21 @@ describe('Add plugin modal', () => {
       return Promise.resolve();
     });
     const {
-      findByText, getByRole, findByLabelText, queryByRole,
+      findByText, findByRole, getByRole, findByLabelText, queryByRole,
     } = render(<App />);
 
+    // open the plugin first, to make sure it doesn't cause a crash when removing
+    const pluginButton = await findByRole('button', { name: /Foo/ });
+    await userEvent.click(pluginButton);
+
     const managePluginsButton = await findByText('Manage plugins');
-    userEvent.click(managePluginsButton);
+    await userEvent.click(managePluginsButton);
 
     const pluginDropdown = await findByLabelText('Plugin name');
     await userEvent.selectOptions(pluginDropdown, [getByRole('option', { name: 'Foo' })]);
 
     const submitButton = await findByText('Remove');
-    userEvent.click(submitButton);
+    await userEvent.click(submitButton);
     await waitFor(() => {
       expect(spy.mock.calls.map((call) => call[0])).toContain(ipcMainChannels.REMOVE_PLUGIN);
     });

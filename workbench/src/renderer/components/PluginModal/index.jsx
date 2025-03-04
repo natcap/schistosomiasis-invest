@@ -13,49 +13,65 @@ import { ipcMainChannels } from '../../../main/ipcMainChannels';
 const { ipcRenderer } = window.Workbench.electron;
 
 export default function PluginModal(props) {
-  const { updateInvestList } = props;
+  const { updateInvestList, closeInvestModel, openJobs } = props;
   const [showPluginModal, setShowPluginModal] = useState(false);
-  const [url, setURL] = useState(undefined);
-  const [revision, setRevision] = useState(undefined);
-  const [path, setPath] = useState(undefined);
-  const [err, setErr] = useState(undefined);
-  const [pluginToRemove, setPluginToRemove] = useState(undefined);
-  const [loading, setLoading] = useState(false);
+  const [url, setURL] = useState('');
+  const [revision, setRevision] = useState('');
+  const [path, setPath] = useState('');
+  const [installErr, setInstallErr] = useState('');
+  const [uninstallErr, setUninstallErr] = useState('');
+  const [pluginToRemove, setPluginToRemove] = useState('');
+  const [installLoading, setInstallLoading] = useState(false);
+  const [uninstallLoading, setUninstallLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const [plugins, setPlugins] = useState({});
   const [installFrom, setInstallFrom] = useState('url');
 
   const handleModalClose = () => {
-    setURL(undefined);
-    setRevision(undefined);
-    setErr(false);
+    setURL('');
+    setRevision('');
+    setInstallErr('');
+    setUninstallErr('');
     setShowPluginModal(false);
   };
   const handleModalOpen = () => setShowPluginModal(true);
 
   const addPlugin = () => {
-    setLoading(true);
+    setInstallLoading(true);
+    ipcRenderer.on(`plugin-install-status`, (msg) => { setStatusMessage(msg); });
     ipcRenderer.invoke(
       ipcMainChannels.ADD_PLUGIN,
       installFrom === 'url' ? url : undefined, // url
       installFrom === 'url' ? revision : undefined, // revision
       installFrom === 'path' ? path : undefined // path
     ).then((addPluginErr) => {
-      setLoading(false);
+      setInstallLoading(false);
       updateInvestList();
       if (addPluginErr) {
-        setErr(true);
+        setInstallErr(addPluginErr);
       } else {
-        setShowPluginModal(false);
+        // clear the input fields
+        setURL('');
+        setRevision('');
+        setPath('');
       }
     });
   };
 
   const removePlugin = () => {
-    setLoading(true);
-    ipcRenderer.invoke(ipcMainChannels.REMOVE_PLUGIN, pluginToRemove).then(() => {
-      updateInvestList();
-      setLoading(false);
-      setShowPluginModal(false);
+    setUninstallLoading(true);
+    Object.keys(openJobs).forEach((tabID) => {
+      if (openJobs[tabID].modelID === pluginToRemove) {
+        closeInvestModel(tabID);
+      }
+    });
+    ipcRenderer.invoke(ipcMainChannels.REMOVE_PLUGIN, pluginToRemove).then((err) => {
+      if (err) {
+        setUninstallErr(err)
+      } else {
+        updateInvestList();
+        setUninstallLoading(false);
+      }
     });
   };
 
@@ -68,7 +84,7 @@ export default function PluginModal(props) {
         }
       }
     );
-  }, [loading]);
+  }, [installLoading, uninstallLoading]);
 
   const { t } = useTranslation();
 
@@ -82,6 +98,7 @@ export default function PluginModal(props) {
             id="url"
             type="text"
             placeholder="https://github.com/owner/repo.git"
+            value={url}
             onChange={(event) => setURL(event.currentTarget.value)}
           />
           <Form.Text className="text-muted">
@@ -93,6 +110,7 @@ export default function PluginModal(props) {
           <Form.Control
             id="branch"
             type="text"
+            value={revision}
             onChange={(event) => setRevision(event.currentTarget.value)}
           />
           <Form.Text className="text-muted">
@@ -111,6 +129,7 @@ export default function PluginModal(props) {
           placeholder={window.Workbench.OS === 'darwin'
             ? '/Users/username/path/to/plugin/'
             : 'C:\\Documents\\path\\to\\plugin\\'}
+          value={path}
           onChange={(event) => setPath(event.currentTarget.value)}
         />
       </Form.Group>
@@ -136,10 +155,19 @@ export default function PluginModal(props) {
           </Form.Group>
           {pluginFields}
           <Button
-            disabled={loading}
+            disabled={installLoading}
             onClick={addPlugin}
           >
-            {t('Add')}
+            {
+              installLoading ? (
+                <div className="adding-button">
+                  <Spinner animation="border" role="status" size="sm" className="plugin-spinner">
+                    <span className="sr-only">{t('Adding...')}</span>
+                  </Spinner>
+                  {t(statusMessage)}
+                </div>
+              ) : t('Add')
+            }
           </Button>
           <Form.Text className="text-muted">
             {t('This may take several minutes')}
@@ -162,27 +190,60 @@ export default function PluginModal(props) {
                     value={pluginID}
                     key={pluginID}
                   >
-                    {plugins[pluginID].model_name}
+                    {plugins[pluginID].modelTitle}
                   </option>
                 )
               )
             }
           </Form.Control>
           <Button
-            disabled={loading || !Object.keys(plugins).length}
+            disabled={uninstallLoading || !Object.keys(plugins).length}
             className="mt-3"
             onClick={removePlugin}
           >
-            {t('Remove')}
+            {
+              uninstallLoading ? (
+                <div className="adding-button">
+                  <Spinner animation="border" role="status" size="sm" className="plugin-spinner">
+                    <span className="sr-only">{t('Removing...')}</span>
+                  </Spinner>
+                  {t('Removing...')}
+                </div>
+              ) : t('Remove')
+            }
           </Button>
         </Form.Group>
       </Form>
     </Modal.Body>
   );
-  if (err) {
+  if (installErr) {
     modalBody = (
       <Modal.Body>
-        {t('Plugin installation failed. Check the workbench log for details.')}
+        <h5>{t('Error installing plugin:')}</h5>
+        <div className="plugin-error">{installErr}</div>
+        <Button
+          onClick={() => ipcRenderer.send(
+            ipcMainChannels.SHOW_ITEM_IN_FOLDER,
+            window.Workbench.ELECTRON_LOG_PATH,
+          )}
+        >
+          {t('Find workbench logs')}
+        </Button>
+      </Modal.Body>
+    );
+  } else if (uninstallErr) {
+    modalBody = (
+      <Modal.Body>
+        <h5>{t('Error removing plugin:')}</h5>
+        <div className="plugin-error">{uninstallErr}</div>
+        <Button
+          onClick={() => ipcRenderer.send(
+            ipcMainChannels.SHOW_ITEM_IN_FOLDER,
+            window.Workbench.ELECTRON_LOG_PATH,
+          )}
+        >
+          {t('Find workbench logs')}
+        </Button>
       </Modal.Body>
     );
   }
@@ -196,13 +257,6 @@ export default function PluginModal(props) {
       <Modal show={showPluginModal} onHide={handleModalClose} contentClassName="plugin-modal">
         <Modal.Header>
           <Modal.Title>{t('Manage plugins')}</Modal.Title>
-          {loading && (
-            <Form.Group>
-              <Spinner animation="border" role="status" className="m-2">
-                <span className="sr-only">{t('Loading...')}</span>
-              </Spinner>
-            </Form.Group>
-          )}
         </Modal.Header>
         {modalBody}
       </Modal>
@@ -212,4 +266,8 @@ export default function PluginModal(props) {
 
 PluginModal.propTypes = {
   updateInvestList: PropTypes.func.isRequired,
+  closeInvestModel: PropTypes.func.isRequired,
+  openJobs: PropTypes.shape({
+    modelID: PropTypes.string,
+  }).isRequired,
 };
