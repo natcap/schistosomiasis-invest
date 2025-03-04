@@ -108,7 +108,7 @@ export const createWindow = async () => {
       });
     }
 
-    const scriptPath = path.join(__dirname, 'install_vc_redist.ps1');
+    const scriptPath = path.join(process.resourcePath, '/scripts/install_vc_redist.ps1');
     runPowerShellScript(scriptPath, (exitCode) => {
       if (exitCode === 0) {
         logger.info('ps1 success');
