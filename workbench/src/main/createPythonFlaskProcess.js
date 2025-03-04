@@ -112,12 +112,12 @@ export async function getJupyterIsReady(port, { i = 0, retries = 41 } = {}) {
 
 /**
  * Launch the voila server running a jupyter notebook for a given plugin.
- * @param {string} pluginID - id of the plugin
+ * @param {string} modelID - id of the plugin
  * @param {number} _port - port to launch the voila server. If undefined,
  *                       an available port will be chosen.
  * @returns {Array} [subprocess, port]
  */
-export async function createJupyterProcess(pluginID, _port = undefined) {
+export async function createJupyterProcess(modelID, _port = undefined) {
   let port = _port;
   if (port === undefined) {
     port = await getFreePort();
@@ -125,14 +125,14 @@ export async function createJupyterProcess(pluginID, _port = undefined) {
   }
   logger.debug('creating voila server process');
 
-  const mamba = settingsStore.get('mamba');
-  const modelEnvPath = settingsStore.get(`plugins.${pluginID}.env`);
-  const relativeNotebookPath = settingsStore.get(`plugins.${pluginID}.notebook_path`);
+  const micromamba = settingsStore.get('micromamba');
+  const modelEnvPath = settingsStore.get(`plugins.${modelID}.env`);
+  const relativeNotebookPath = settingsStore.get(`plugins.${modelID}.notebook_path`);
 
   // Extract the location of the installed plugin from `pip show`
   // The notebook should be available there as package data
   const pipShow = execSync(
-    `${mamba} run --prefix "${modelEnvPath}" pip show ${pluginID}`,
+    `${micromamba} run --prefix "${modelEnvPath}" pip show ${modelID}`,
     { windowsHide: true }
   ).toString();
   const pluginLocation = pipShow.match(/Location: (.+)/)[1];
@@ -142,10 +142,10 @@ export async function createJupyterProcess(pluginID, _port = undefined) {
     'run', '--prefix', `"${modelEnvPath}"`,
     'voila', `"${notebookPath}"`, '--debug', '--no-browser', '--port', port,
   ];
-  logger.debug('spawning command:', mamba, args);
+  logger.debug('spawning command:', micromamba, args);
 
   // shell: true necessary in dev mode & relying on a conda env
-  const subprocess = spawn(mamba, args, { shell: true });
+  const subprocess = spawn(micromamba, args, { shell: true });
   setupServerProcessHandlers(subprocess);
   await getJupyterIsReady(port, 0, 500);
   return [subprocess, port];
