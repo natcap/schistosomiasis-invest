@@ -156,7 +156,7 @@ export function setupAddPlugin(i18n) {
             type: 'plugin',
             source: installString,
             env: pluginEnvPrefix,
-	    notebook_path: notebookPath; // Schisto-InVEST ONLY
+	    notebook_path: notebookPath, // Schisto-InVEST ONLY
           }
         );
         logger.info('successfully added plugin');
