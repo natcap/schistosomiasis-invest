@@ -84,6 +84,38 @@ export const createWindow = async () => {
 
   settingsStore.set('investExe', findInvestBinaries(ELECTRON_DEV_MODE));
   settingsStore.set('micromamba', findMicromambaExecutable(ELECTRON_DEV_MODE));
+  // install visual C++ dependencies for micromamba
+  if (!ELECTRON_DEV_MODE && process.platform === 'win32') {
+    logger.info('ps1 section');
+    function runPowerShellScript(scriptPath, callback) {
+      const powershell = spawn('powershell.exe', [
+        '-ExecutionPolicy', 'Bypass',
+        '-File', path.resolve(scriptPath)
+      ]);
+
+      powershell.stdout.on('data', (data) => {
+        logger.info('ps1 stdout:', data.toString());
+      });
+      powershell.stderr.on('data', (data) => {
+        logger.info('ps1 stderr:', data.toString());
+      });
+      powershell.on('exit', (code) => {
+        logger.info(`ps1 exited w/ code ${code}`);
+        if (callback) {
+          callback(code);
+        }
+      });
+    }
+
+    const scriptPath = path.join(__dirname, 'install_vc_redist.ps1');
+    runPowerShellScript(scriptPath, (exitCode) => {
+      if (exitCode === 0) {
+        logger.info('ps1 success');
+      } else {
+        logger.info('ps1 fail:', exitCode);
+      }
+    });
+  }
   // No plugin server processes should persist between workbench sessions
   // In case any were left behind, remove them
   const plugins = settingsStore.get('plugins');
