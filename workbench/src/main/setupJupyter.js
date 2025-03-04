@@ -41,7 +41,8 @@ function serveWorkspace(dir) {
   console.log('SERVING', dir);
   const app = connect();
   app.use(serveStatic(dir));
-  return http.createServer(app).listen(8080);
+  // Listening on 8081 to avoid confilct with VM testing
+  return http.createServer(app).listen(8081);
 }
 
 export default function setupJupyter(parentWindow, isDevMode) {

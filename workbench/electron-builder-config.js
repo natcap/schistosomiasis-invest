@@ -59,7 +59,12 @@ const config = {
       from: '../NOTICE.txt',
       to: 'NOTICE.InVEST.txt',
     },
+    {
+      from: './scripts/install_vc_redist.ps1',
+      to: './scripts/install_vc_redist.ps1',
+    },
   ],
+  asarUnpack: "./scripts/install_vc_redist.ps1",
   appId: APP_ID,
   productName: PRODUCT_NAME,
   artifactName: ARTIFACT_NAME,
