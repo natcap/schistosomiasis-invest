@@ -175,11 +175,7 @@ export async function fetchDatastackFromFile(payload) {
  * @returns {Promise} resolves undefined
  */
 export async function saveToPython(payload) {
-<<<<<<< HEAD
-  const port = await getPort(payload.modelname);
-=======
   const port = await getPort(payload.model_id);
->>>>>>> feature/plugins
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/save_to_python`, {
       method: 'post',
