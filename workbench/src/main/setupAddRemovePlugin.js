@@ -121,7 +121,7 @@ export function setupAddPlugin(i18n) {
         const pluginID = pyprojectTOML.tool.natcap.invest.model_id;
         const pluginTitle = pyprojectTOML.tool.natcap.invest.model_title;
         const condaDeps = pyprojectTOML.tool.natcap.invest.conda_dependencies;
-	// Unique to schisto-invest and the schisto plugin only
+	      // Unique to schisto-invest and the schisto plugin only
         const notebookPath = pyprojectTOML.tool.natcap.invest.notebook_path;
 
         // Create a conda env containing the plugin and its dependencies
@@ -156,7 +156,7 @@ export function setupAddPlugin(i18n) {
             type: 'plugin',
             source: installString,
             env: pluginEnvPrefix,
-	    notebook_path: notebookPath, // Schisto-InVEST ONLY
+      	    notebook_path: notebookPath, // schisto-invest only
           }
         );
         logger.info('successfully added plugin');

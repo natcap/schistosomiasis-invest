@@ -41,7 +41,7 @@ function serveWorkspace(dir) {
   console.log('SERVING', dir);
   const app = connect();
   app.use(serveStatic(dir));
-  // Listening on 8081 to avoid confilct with VM testing
+  // Listening on 8081 to avoid conflict with VM testing
   return http.createServer(app).listen(8081);
 }
 
