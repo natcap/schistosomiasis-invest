@@ -48,7 +48,16 @@ function initializeArgValues(argsSpec, inputFieldOrder, argsDict) {
   const initIsEmpty = Object.keys(argsDict).length === 0;
   const argsValues = {};
   const argsDropdownOptions = {};
-  inputFieldOrder.flat().forEach((argkey) => {
+  const argkeys = [];
+  // Custom handling of inputs for Schisto Plugin
+  inputFieldOrder.flat().forEach((group) => {
+    if (typeof group === 'string') {
+      argkeys.push(group);
+    } else {
+      argkeys.push(...Object.values(group)[0]);
+    }
+  });
+  argkeys.forEach((argkey) => {
     // When initializing with undefined values, assign defaults so that,
     // a) values are handled well by the html inputs and
     // b) the object exported to JSON on "Save" or "Execute" includes defaults.

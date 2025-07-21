@@ -1,4 +1,5 @@
 import path from 'path';
+import { spawn } from 'child_process';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import {
   app,
@@ -44,6 +45,7 @@ import { setupIsNewVersion } from './setupIsNewVersion';
 import setupOpenExternalUrl from './setupOpenExternalUrl';
 import setupOpenLocalHtml from './setupOpenLocalHtml';
 import setupRendererLogger from './setupRendererLogger';
+import setupJupyter from './setupJupyter';
 
 const logger = getLogger(__filename.split('/').slice(-1)[0]);
 
@@ -56,6 +58,8 @@ process.on('unhandledRejection', (err, promise) => {
   logger.error(err);
   process.exit(1);
 });
+
+process.env.JUPYTER_TOKEN = 'abcdef';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -85,6 +89,38 @@ export const createWindow = async () => {
 
   settingsStore.set('investExe', findInvestBinaries(ELECTRON_DEV_MODE));
   settingsStore.set('micromamba', findMicromambaExecutable(ELECTRON_DEV_MODE));
+  // install visual C++ dependencies for micromamba
+  if (!ELECTRON_DEV_MODE && process.platform === 'win32') {
+    logger.info('ps1 section');
+    function runPowerShellScript(scriptPath, callback) {
+      const powershell = spawn('powershell.exe', [
+        '-ExecutionPolicy', 'Bypass',
+        '-File', path.resolve(scriptPath)
+      ]);
+
+      powershell.stdout.on('data', (data) => {
+        logger.info('ps1 stdout:', data.toString());
+      });
+      powershell.stderr.on('data', (data) => {
+        logger.info('ps1 stderr:', data.toString());
+      });
+      powershell.on('exit', (code) => {
+        logger.info(`ps1 exited w/ code ${code}`);
+        if (callback) {
+          callback(code);
+        }
+      });
+    }
+
+    const scriptPath = path.join(process.resourcePath, '/scripts/install_vc_redist.ps1');
+    runPowerShellScript(scriptPath, (exitCode) => {
+      if (exitCode === 0) {
+        logger.info('ps1 success');
+      } else {
+        logger.info('ps1 fail:', exitCode);
+      }
+    });
+  }
   // No plugin server processes should persist between workbench sessions
   // In case any were left behind, remove them
   const plugins = settingsStore.get('plugins');
@@ -160,6 +196,7 @@ export const createWindow = async () => {
   // have callbacks that won't work until the invest server is ready.
   setupContextMenu(mainWindow);
   setupDownloadHandlers(mainWindow);
+  setupJupyter(mainWindow, ELECTRON_DEV_MODE);
   setupInvestRunHandlers();
   setupLaunchPluginServerHandler();
   setupAddPlugin(i18n);
