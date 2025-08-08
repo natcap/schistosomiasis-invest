@@ -157,7 +157,7 @@ function parseArgType(argtype) {
   return userFriendlyArgType;
 }
 
-export default function ArgInput(props) {
+export function ArgInput(props) {
   const uniqueId = useId();
   const inputRef = useRef();
 
