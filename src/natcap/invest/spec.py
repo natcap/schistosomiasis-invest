@@ -1516,7 +1516,8 @@ class ModelSpec(BaseModel):
     Example: ``"https://github.com/natcap/invest-demo-plugin/blob/main/README.md"``
     """
 
-    input_field_order: list[list[str]]
+    #input_field_order: list[list[str]]
+    input_field_order: typing.Any
     """A list that specifies the order and grouping of model inputs.
     Inputs will be displayed in the input form from top to bottom in the order
     listed here. Sub-lists represent groups of inputs that will be visually
