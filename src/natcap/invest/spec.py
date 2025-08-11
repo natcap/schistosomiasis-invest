@@ -1563,10 +1563,10 @@ class ModelSpec(BaseModel):
                 if isinstance(key, dict):
                     dict_key = list(key.keys())[0]
                     for val_key in key[dict_key]:
-                        if key in found_keys:
+                        if val_key in found_keys:
                             raise ValueError(
-                                f'Key {key} appears more than once in input_field_order')
-                        found_keys.add(key)
+                                f'Key {val_key} appears more than once in input_field_order')
+                        found_keys.add(val_key)
                 else:
                     if key in found_keys:
                         raise ValueError(
