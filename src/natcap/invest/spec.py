@@ -1560,10 +1560,18 @@ class ModelSpec(BaseModel):
         found_keys = set()
         for group in self.input_field_order:
             for key in group:
-                if key in found_keys:
-                    raise ValueError(
-                        f'Key {key} appears more than once in input_field_order')
-                found_keys.add(key)
+                if isinstance(key, dict):
+                    dict_key = list(key.keys())[0]
+                    for val_key in key[dict_key]:
+                        if key in found_keys:
+                            raise ValueError(
+                                f'Key {key} appears more than once in input_field_order')
+                        found_keys.add(key)
+                else:
+                    if key in found_keys:
+                        raise ValueError(
+                            f'Key {key} appears more than once in input_field_order')
+                    found_keys.add(key)
         for _input in self.inputs:
             if _input.hidden is True:
                 if _input.id in found_keys:
