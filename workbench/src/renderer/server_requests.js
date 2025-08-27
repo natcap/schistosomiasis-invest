@@ -160,7 +160,7 @@ export async function fetchValidation(payload) {
  * @returns {Promise} resolves undefined
  */
 export async function fetchDatastackFromFile(payload) {
-  const port = await getPort(payload.modelId);
+  const port = await getCorePort(payload.modelId);
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/post_datastack_file`, {
       method: 'post',
