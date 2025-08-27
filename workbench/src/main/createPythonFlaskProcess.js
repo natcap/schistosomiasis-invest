@@ -129,13 +129,9 @@ export async function createJupyterProcess(modelID, _port = undefined) {
   const modelEnvPath = settingsStore.get(`plugins.${modelID}.env`);
   const relativeNotebookPath = settingsStore.get(`plugins.${modelID}.notebook_path`);
 
-  // Extract the location of the installed plugin from `pip show`
+  // Extract the location of the installed plugin from env path.
   // The notebook should be available there as package data
-  const pipShow = execSync(
-    `${micromamba} run --prefix "${modelEnvPath}" pip show ${modelID}`,
-    { windowsHide: true }
-  ).toString();
-  const pluginLocation = pipShow.match(/Location: (.+)/)[1];
+  const pluginLocation = `${modelEnvPath}/Lib/site-packages/`;
   const notebookPath = `${pluginLocation}/${relativeNotebookPath}`;
 
   const args = [
@@ -150,33 +146,6 @@ export async function createJupyterProcess(modelID, _port = undefined) {
   await getJupyterIsReady(port, 0, 500);
   return [subprocess, port];
 }
-
-// /**
-//  * Spawn a child process running the Python Flask app.
-//  *
-//  * @param  {string} investExe - path to executeable that launches flask app.
-//  * @returns {ChildProcess} - a reference to the subprocess.
-//  */
-// export function createPythonFlaskProcess(investExe) {
-//   const subprocess = launchSubprocess(
-//     investExe,
-//     ['--debug', 'serve', '--port', process.env.PORT],
-//     { shell: true } // necessary in dev mode & relying on a conda env
-//   );
-//   return subprocess;
-// // =======
-// //   pythonServerProcess.on('close', (code, signal) => {
-// //     logger.debug(`Flask process closed with code ${code} and signal ${signal}`);
-// //   });
-// //   pythonServerProcess.on('exit', (code) => {
-// //     logger.debug(`Flask process exited with code ${code}`);
-// //   });
-// //   pythonServerProcess.on('disconnect', () => {
-// //     logger.debug('Flask process disconnected');
-// //   });
-//   pidToSubprocess[subprocess.pid] = subprocess;
-// // >>>>>>> upstream/feature/plugins
-// }
 
 /**
  * Spawn a child process running the Python Flask app for core invest.
