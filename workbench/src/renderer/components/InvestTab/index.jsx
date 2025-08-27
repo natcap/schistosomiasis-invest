@@ -26,7 +26,7 @@ const { ipcRenderer } = window.Workbench.electron;
 const { logger } = window.Workbench;
 
 function handleViewResults(logfile, modelID) {
-  console.log('View Results');
+  logger.debug('Viewing results');
   ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
 }
 
