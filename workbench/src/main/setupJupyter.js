@@ -47,10 +47,14 @@ function serveWorkspace(dir) {
 
 export default function setupJupyter(parentWindow, isDevMode) {
   ipcMain.on(
-    ipcMainChannels.OPEN_JUPYTER, async (event, filepath, pluginID) => {
+    ipcMainChannels.OPEN_JUPYTER, async (event, filepath, modelID) => {
       const httpServer = serveWorkspace(path.dirname(filepath));
-      const [subprocess, port] = await createJupyterProcess(pluginID);
+      // are there createWindow options for default text?
       const child = createWindow(parentWindow, isDevMode);
+      // try/catch around this call to help avoid hard crashes.
+      // some placeholder html docs for loading and error reporting.
+      // child.loadFile could handle it.
+      const [subprocess, port] = await createJupyterProcess(modelID);
       child.loadURL(`http://localhost:${port}/?token=${process.env.JUPYTER_TOKEN}`);
       child.on('close', async () => {
         await shutdownPythonProcess(subprocess.pid);
