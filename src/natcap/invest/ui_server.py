@@ -159,8 +159,7 @@ def get_args_enabled():
 def post_datastack_file():
     """Extracts InVEST model args from json, logfiles, or datastacks.
 
-    Body (JSON string): 
-        filepath: string, path to file
+    Body (JSON string): path to file
 
     Returns:
         A JSON string.
