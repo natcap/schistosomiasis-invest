@@ -153,11 +153,14 @@ export async function fetchValidation(payload) {
 /**
  * Load invest arguments from a datastack-compliant file.
  *
- * @param {string} payload - path to file
+ * @param  {object} payload {
+ *   filepath: string, path to file
+ *   modelId: string (e.g. carbon)
+ * }
  * @returns {Promise} resolves undefined
  */
 export async function fetchDatastackFromFile(payload) {
-  const port = await getCorePort();
+  const port = await getCorePort(payload.modelId);
   return (
     window.fetch(`${HOSTNAME}:${port}/${PREFIX}/post_datastack_file`, {
       method: 'post',

@@ -25,6 +25,11 @@ import { ipcMainChannels } from '../../../main/ipcMainChannels';
 const { ipcRenderer } = window.Workbench.electron;
 const { logger } = window.Workbench;
 
+function handleViewResults(logfile, modelID) {
+  logger.debug('Viewing results');
+  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
+}
+
 /**
  * Render an invest model setup form, log display, etc.
  * Manage launching of an invest model in a child process.
@@ -289,6 +294,7 @@ class InvestTab extends React.Component {
                       <ModelStatusAlert
                         status={status}
                         handleOpenWorkspace={() => this.handleOpenWorkspace(argsValues?.workspace_dir)}
+                        handleViewResults={() => handleViewResults(logfile, modelID)}
                         terminateInvestProcess={this.terminateInvestProcess}
                       />
                     )
