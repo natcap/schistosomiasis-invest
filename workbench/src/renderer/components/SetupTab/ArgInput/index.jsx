@@ -520,8 +520,6 @@ export function FormTableInput(props) {
   } = props;
   let { validationMessage } = props;
 
-  console.log('render formtable', argkeys);
-
   const { t } = useTranslation();
 
   // Custom functionality for Schisto plugin
