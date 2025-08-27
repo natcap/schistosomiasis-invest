@@ -44,7 +44,7 @@ export function setupLaunchPluginServerHandler() {
 export function setupInvestRunHandlers() {
   const runningJobs = {};
   ipcMain.handle(ipcMainChannels.WRITE_CSV, (event, values) => {
-    console.log('WRITE_CSV');
+    logger.debug('WRITE_CSV');
     // Write a temporary datastack json for passing to invest CLI
     try {
       fs.mkdirSync(TEMP_DIR);
@@ -60,7 +60,7 @@ export function setupInvestRunHandlers() {
       vals.push(v);
     });
     const text = [keys.join(','), vals.join(',')].join('\n');
-    console.log('writing', text);
+    logger.debug('WRITE_CSV: writing text');
     fs.writeFileSync(csvPath, text, 'utf8');
     return csvPath;
   });
