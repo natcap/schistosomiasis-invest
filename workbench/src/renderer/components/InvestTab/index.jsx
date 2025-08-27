@@ -25,9 +25,9 @@ import { ipcMainChannels } from '../../../main/ipcMainChannels';
 const { ipcRenderer } = window.Workbench.electron;
 const { logger } = window.Workbench;
 
-function handleViewResults(logfile, pluginID) {
+function handleViewResults(logfile, modelID) {
   console.log('View Results');
-  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, pluginID);
+  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
 }
 
 /**
@@ -295,7 +295,7 @@ class InvestTab extends React.Component {
                       <ModelStatusAlert
                         status={status}
                         handleOpenWorkspace={() => this.handleOpenWorkspace(argsValues?.workspace_dir)}
-                        handleViewResults={() => handleViewResults(logfile, modelSpec.model_id)}
+                        handleViewResults={() => handleViewResults(logfile, modelID)}
                         terminateInvestProcess={this.terminateInvestProcess}
                       />
                     )
