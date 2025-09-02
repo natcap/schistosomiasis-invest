@@ -92,14 +92,8 @@ def build_environment_from_requirements(cli_args):
                 else:
                     conda_requirements.add(line)
 
-    #conda_deps_string = '\n'.join(
-    #    [f'- {dep}' for dep in sorted(conda_requirements, key=str.casefold)])
-    conda_deps_string = ""
-    for dep in sorted(conda_requirements, key=str.casefold):
-        if "*" in dep:
-            conda_deps_string += f"- '{dep}'\n"
-        else:
-            conda_deps_string += f'- {dep}\n'
+    conda_deps_string = '\n'.join(
+        [f'- {dep}' for dep in sorted(conda_requirements, key=str.casefold)])
 
     if pip_requirements:
         pip_deps_string = '- pip:\n' + '\n'.join(
