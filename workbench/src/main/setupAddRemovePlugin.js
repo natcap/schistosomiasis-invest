@@ -19,7 +19,7 @@ const logger = getLogger(__filename.split('/').slice(-1)[0]);
 // on and build an invest version not available on conda-forge
 if (process.platform.startsWith('win')) {
   logger.info('Windows detected, set GDAL env.');
-  process.env.NATCAP_INVEST_GDAL_LIB_PATH = `${process.evn.CONDA_PREFIX}/Library`;
+  process.env.NATCAP_INVEST_GDAL_LIB_PATH = `${process.env.CONDA_PREFIX}/Library`;
   logger.info('Windows NatCap GDAL env:');
   logger.info(process.env.NATCAP_INVEST_GDAL_LIB_PATH);
 }
