@@ -22,9 +22,11 @@ export const ipcMainChannels = {
   OPEN_EXTERNAL_URL: 'open-external-url',
   OPEN_PATH: 'open-path',
   OPEN_LOCAL_HTML: 'open-local-html',
+  OPEN_JUPYTER: 'open-jupyter-lab',
   REMOVE_PLUGIN: 'remove-plugin',
   SET_SETTING: 'set-setting',
   SHOW_ITEM_IN_FOLDER: 'show-item-in-folder',
   SHOW_OPEN_DIALOG: 'show-open-dialog',
   SHOW_SAVE_DIALOG: 'show-save-dialog',
+  WRITE_CSV: 'write-csv',
 };

@@ -1,6 +1,6 @@
 {
   "name": "invest-workbench",
-  "version": "3.16.1",
+  "version": "3.16.2",
   "description": "Models that map and value the goods and services from nature that sustain and fulfill human life",
   "main": "build/main/main.js",
   "homepage": "./",
@@ -53,14 +53,18 @@
   "license": "MIT",
   "dependencies": {
     "@babel/runtime": "^7.13.10",
+    "connect": "^3.7.0",
+    "csv-parse": "^5.5.6",
     "electron-log": "^4.3.5",
     "electron-store": "^8.1.0",
+    "http-server": "^14.1.1",
     "i18next": "^22.4.9",
     "localforage": "^1.9.0",
     "node-fetch": "^2.6.7",
     "nodejs-file-downloader": "^4.13.0",
     "prop-types": "^15.7.2",
     "react-i18next": "^12.1.4",
+    "serve-static": "^1.15.0",
     "toml": "^3.0.0",
     "upath": "^2.0.1",
     "yauzl": "^2.10.0"

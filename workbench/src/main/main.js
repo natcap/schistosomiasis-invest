@@ -1,4 +1,5 @@
 import path from 'path';
+import { spawn } from 'child_process';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import {
   app,
@@ -44,6 +45,7 @@ import { setupIsNewVersion } from './setupIsNewVersion';
 import setupOpenExternalUrl from './setupOpenExternalUrl';
 import setupOpenLocalHtml from './setupOpenLocalHtml';
 import setupRendererLogger from './setupRendererLogger';
+import setupJupyter from './setupJupyter';
 
 const logger = getLogger(__filename.split('/').slice(-1)[0]);
 
@@ -56,6 +58,8 @@ process.on('unhandledRejection', (err, promise) => {
   logger.error(err);
   process.exit(1);
 });
+
+process.env.JUPYTER_TOKEN = 'abcdef';
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -160,6 +164,7 @@ export const createWindow = async () => {
   // have callbacks that won't work until the invest server is ready.
   setupContextMenu(mainWindow);
   setupDownloadHandlers(mainWindow);
+  setupJupyter(mainWindow, ELECTRON_DEV_MODE);
   setupInvestRunHandlers();
   setupLaunchPluginServerHandler();
   setupAddPlugin(i18n);

@@ -15,6 +15,15 @@ import { shutdownPythonProcess } from './createPythonFlaskProcess';
 
 const logger = getLogger(__filename.split('/').slice(-1)[0]);
 
+// Custom Schisto code to faciliate the invest-schisto plugins need to rely
+// on and build an invest version not available on conda-forge
+if (process.platform.startsWith('win')) {
+  logger.info('Windows detected, set GDAL env.');
+  process.env.NATCAP_INVEST_GDAL_LIB_PATH = `${process.env.CONDA_PREFIX}/Library`;
+  logger.info('Windows NatCap GDAL env:');
+  logger.info(process.env.NATCAP_INVEST_GDAL_LIB_PATH);
+}
+
 /**
  * Spawn a child process and log its stdout, stderr, and any error in spawning.
  *
@@ -135,6 +144,8 @@ export function setupAddPlugin(i18n) {
         // Access plugin metadata from the pyproject.toml
         const condaDeps = pyprojectTOML.tool.natcap.invest.conda_dependencies;
         const packageName = pyprojectTOML.tool.natcap.invest.package_name;
+        // Unique to schisto-invest and the schisto plugin only
+        const notebookPath = pyprojectTOML.tool.natcap.invest.notebook_path;
 
         // Create a conda env containing the plugin and its dependencies
         // use timestamp to ensure a unique path
@@ -203,6 +214,7 @@ export function setupAddPlugin(i18n) {
             source: installString,
             env: pluginEnvPrefix,
             version: version,
+      	    notebook_path: notebookPath, // schisto-invest only
           }
         );
         logger.info('successfully added plugin');

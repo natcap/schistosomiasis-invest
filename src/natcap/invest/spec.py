@@ -1315,7 +1315,17 @@ class OptionStringInput(Input):
         return sorted(lines, key=lambda line: line.casefold())
 
 
-class SingleBandRasterOutput(Output):
+class FileOutput(Output):
+    """A generic file output, or result, of an invest model.
+
+    This represents a not-otherwise-specified file output type. Use this only if
+    a more specific type, such as `CSVOutput` or `VectorOutput`, does not apply.
+    """
+    path: str
+    """Path to the output file within the workspace directory"""
+
+
+class SingleBandRasterOutput(FileOutput):
     """A single-band raster output, or result, of an invest model.
 
     This represents a raster file output (all GDAL-supported raster file types
@@ -1328,7 +1338,7 @@ class SingleBandRasterOutput(Output):
     """units of measurement of the raster values"""
 
 
-class RasterOutput(Output):
+class RasterOutput(FileOutput):
     """A raster output, or result, of an invest model.
 
     This represents a raster file output (all GDAL-supported raster file types
@@ -1339,7 +1349,7 @@ class RasterOutput(Output):
     the raster."""
 
 
-class VectorOutput(Output):
+class VectorOutput(FileOutput):
     """A vector output, or result, of an invest model.
 
     This represents a vector file output (all GDAL-supported vector file types
@@ -1361,7 +1371,7 @@ class VectorOutput(Output):
         return self
 
 
-class CSVOutput(Output):
+class CSVOutput(FileOutput):
     """A CSV table output, or result, of an invest model.
 
     For CSVs with a simple layout, `columns` or `rows` (but not both) may be
@@ -1401,38 +1411,6 @@ class CSVOutput(Output):
             if type(col) not in allowed_types:
                 raise ValueError(f'Column {col} is not an allowed type')
         return self
-
-
-class DirectoryOutput(Output):
-    """A directory output, or result, of an invest model.
-
-    Use this type when you need to specify a group of many file-based outputs,
-    or an unknown number of file-based outputs, by grouping them together in a
-    directory.
-    """
-    contents: list[Output]
-    """An iterable of `Output`s representing the contents of this directory.
-    The `key` of each output must be the file name or pattern."""
-
-    @model_validator(mode='after')
-    def check_contents_types(self):
-        allowed_types = {
-            CSVOutput, DirectoryOutput, FileOutput,
-            SingleBandRasterOutput, VectorOutput}
-        for content in (self.contents or []):
-            if type(content) not in allowed_types:
-                raise ValueError(
-                    f'Directory contents {content} is not an allowed type')
-        return self
-
-
-class FileOutput(Output):
-    """A generic file output, or result, of an invest model.
-
-    This represents a not-otherwise-specified file output type. Use this only if
-    a more specific type, such as `CSVOutput` or `VectorOutput`, does not apply.
-    """
-    pass
 
 
 class NumberOutput(Output):
@@ -1735,28 +1713,31 @@ FLOW_DIR_ALGORITHM = OptionStringInput(
 )
 
 # Specs for common outputs ####################################################
-TASKGRAPH_DIR = DirectoryOutput(
+TASKGRAPH_CACHE = FileOutput(
     id="taskgraph_cache",
+    path="taskgraph_cache/taskgraph.db",
     about=gettext(
         "Cache that stores data between model runs. This directory contains no"
         " human-readable data and you may ignore it."
-    ),
-    contents=[FileOutput(id="taskgraph.db", about=None)]
+    )
 )
 FILLED_DEM = SingleBandRasterOutput(
-    id='',
+    id='filled_dem',
+    path='filled_dem.tif',
     about=gettext("Map of elevation after any pits are filled"),
     data_type=float,
     units=u.meter
 )
 FLOW_ACCUMULATION = SingleBandRasterOutput(
-    id='',
+    id='flow_accumulation',
+    path='flow_accumulation.tif',
     about=gettext("Map of flow accumulation"),
     data_type=float,
     units=u.none
 )
 FLOW_DIRECTION = SingleBandRasterOutput(
-    id='',
+    id='flow_direction',
+    path='flow_direction.tif',
     about=gettext(
         "MFD flow direction. Note: the pixel values should not be interpreted"
         " directly. Each 32-bit number consists of 8 4-bit numbers. Each 4-bit"
@@ -1767,7 +1748,8 @@ FLOW_DIRECTION = SingleBandRasterOutput(
     units=None
 )
 SLOPE = SingleBandRasterOutput(
-    id="slope.tif",
+    id="slope",
+    path='slope.tif',
     about=gettext(
         "Percent slope, calculated from the pit-filled DEM. 100 is equivalent to"
         " a 45 degree slope."
@@ -1776,7 +1758,8 @@ SLOPE = SingleBandRasterOutput(
     units=None
 )
 STREAM = SingleBandRasterOutput(
-    id='',
+    id='stream',
+    path='stream.tif',
     about=gettext(
         "Stream network, created using flow direction and flow accumulation"
         " derived from the DEM and Threshold Flow Accumulation. Values of 1"
@@ -2076,21 +2059,10 @@ def write_metadata_file(datasource_path, spec, keywords_list,
         None
 
     """
-    def _get_key(key, resource):
-        """Map name of actual key in yml from model_spec key name."""
-        names = {field.name.lower(): field.name
-                 for field in resource.data_model.fields}
-        return names[key]
-
     try:
-        resource = geometamaker.describe(datasource_path)
-    except ValidationError:
-        LOGGER.debug(
-            f"Skipping metadata creation for {datasource_path}, as invalid "
-            "metadata exists.")
-        return None
-    # Don't want function to fail bc can't create metadata due to invalid filetype
+        resource = geometamaker.describe(datasource_path, compute_stats=True)
     except ValueError as e:
+        # Don't want function to fail bc can't create metadata due to invalid filetype
         LOGGER.debug(f"Skipping metadata creation for {datasource_path}: {e}")
         return None
     resource.set_lineage(lineage_statement)
@@ -2106,27 +2078,30 @@ def write_metadata_file(datasource_path, spec, keywords_list,
     if hasattr(spec, 'fields') and spec.fields:
         attr_specs = spec.fields
     if attr_specs:
+        # field names in attr_spec are always lowercase, but the
+        # actual fieldname in the data could be any case because
+        # invest does not require case-sensitive fieldnames
+        field_lookup = {
+            field.name.lower(): field for field in resource._get_fields()}
         for nested_spec in attr_specs:
             try:
-                # field names in attr_spec are always lowercase, but the
-                # actual fieldname in the data could be any case because
-                # invest does not require case-sensitive fieldnames
-                yaml_key = _get_key(nested_spec.id, resource)
+                field_metadata = field_lookup[nested_spec.id]
                 # Field description only gets set if its empty, i.e. ''
-                if len(resource.get_field_description(yaml_key)
-                       .description.strip()) < 1:
-                    about = nested_spec.about
-                    resource.set_field_description(yaml_key, description=about)
+                if len(field_metadata.description.strip()) < 1:
+                    resource.set_field_description(
+                        field_metadata.name, description=nested_spec.about)
                 # units only get set if empty
-                if len(resource.get_field_description(yaml_key)
-                       .units.strip()) < 1:
-                    units = format_unit(nested_spec.units) if hasattr(nested_spec, 'units') else ''
-                    resource.set_field_description(yaml_key, units=units)
+                if len(field_metadata.units.strip()) < 1:
+                    units = format_unit(nested_spec.units) if hasattr(
+                        nested_spec, 'units') else ''
+                    resource.set_field_description(
+                        field_metadata.name, units=units)
             except KeyError as error:
                 # fields that are in the spec but missing
                 # from model results because they are conditional.
                 LOGGER.debug(error)
-    if isinstance(spec, SingleBandRasterInput) or isinstance(spec, SingleBandRasterOutput):
+    if isinstance(spec, SingleBandRasterInput) or isinstance(
+            spec, SingleBandRasterOutput):
         if len(resource.get_band_description(1).units) < 1:
             units = format_unit(spec.units)
             resource.set_band_description(1, units=units)
@@ -2156,21 +2131,16 @@ def generate_metadata_for_outputs(model_module, args_dict):
 
     def _walk_spec(output_spec, workspace):
         for spec_data in output_spec:
-            if type(spec_data) is DirectoryOutput:
-                if 'taskgraph.db' in [s.id for s in spec_data.contents]:
-                    continue
-                _walk_spec(
-                    spec_data.contents,
-                    os.path.join(workspace, spec_data.id))
-            else:
-                pre, post = os.path.splitext(spec_data.id)
-                full_path = os.path.join(workspace, f'{pre}{file_suffix}{post}')
-                if os.path.exists(full_path):
-                    try:
-                        write_metadata_file(
-                            full_path, spec_data, keywords, lineage_statement)
-                    except ValueError as error:
-                        # Some unsupported file formats, e.g. html
-                        LOGGER.debug(error)
+            if 'taskgraph.db' in spec_data.path:
+                continue
+            pre, post = os.path.splitext(spec_data.path)
+            full_path = os.path.join(workspace, f'{pre}{file_suffix}{post}')
+            if os.path.exists(full_path):
+                try:
+                    write_metadata_file(
+                        full_path, spec_data, keywords, lineage_statement)
+                except ValueError as error:
+                    # Some unsupported file formats, e.g. html
+                    LOGGER.debug(error)
 
     _walk_spec(model_module.MODEL_SPEC.outputs, args_dict['workspace_dir'])

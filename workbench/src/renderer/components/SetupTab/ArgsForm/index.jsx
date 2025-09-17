@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 import Form from 'react-bootstrap/Form';
 
-import ArgInput from '../ArgInput';
+import { ArgInput, FormTableInput } from '../ArgInput';
 import { ipcMainChannels } from '../../../../main/ipcMainChannels';
 import { withTranslation } from 'react-i18next';
 
@@ -132,27 +132,52 @@ class ArgsForm extends React.Component {
     argsOrder.forEach((groupArray) => {
       k += 1;
       const groupItems = [];
+      // FormTableInput was developed specifically for the Schisto Plugin project.
       groupArray.forEach((argkey) => {
-        groupItems.push(
-          <ArgInput
-            argkey={argkey}
-            argSpec={argsSpec[argkey]}
-            userguide={userguide}
-            isCoreModel={isCoreModel}
-            dropdownOptions={argsDropdownOptions[argkey]}
-            enabled={argsEnabled[argkey]}
-            updateArgValues={this.props.updateArgValues}
-            handleFocus={this.handleFocus}
-            inputDropHandler={this.inputDropHandler}
-            isValid={argsValidation[argkey].valid}
-            key={argkey}
-            selectFile={this.selectFile}
-            touched={argsValues[argkey].touched}
-            validationMessage={argsValidation[argkey].validationMessage}
-            value={argsValues[argkey].value}
-            scrollEventCount={scrollEventCount}
-          />
-        );
+        if (typeof argkey === 'object') {
+          const groupName = Object.keys(argkey)[0];
+          const argkeys = argkey[groupName];
+          groupItems.push(
+            // FormTableInput may need updating to keep up w/ 3.16.0 changes
+            <FormTableInput
+              argkeys={argkeys}
+              argsSpec={argsSpec}
+              groupName={groupName}
+              userguide={userguide}
+              dropdownOptions={argsDropdownOptions[argkey]}
+              argsEnabled={argsEnabled}
+              updateArgValues={this.props.updateArgValues}
+              handleFocus={this.handleFocus}
+              inputDropHandler={this.inputDropHandler}
+              argsValidation={argsValidation}
+              argsValues={argsValues}
+              key={argkey}
+              selectFile={this.selectFile}
+              scrollEventCount={scrollEventCount}
+            />
+          );
+        } else {
+          groupItems.push(
+            <ArgInput
+              argkey={argkey}
+              argSpec={argsSpec[argkey]}
+              userguide={userguide}
+              isCoreModel={isCoreModel}
+              dropdownOptions={argsDropdownOptions[argkey]}
+              enabled={argsEnabled[argkey]}
+              updateArgValues={this.props.updateArgValues}
+              handleFocus={this.handleFocus}
+              inputDropHandler={this.inputDropHandler}
+              isValid={argsValidation[argkey].valid}
+              key={argkey}
+              selectFile={this.selectFile}
+              touched={argsValues[argkey].touched}
+              validationMessage={argsValidation[argkey].validationMessage}
+              value={argsValues[argkey].value}
+              scrollEventCount={scrollEventCount}
+            />
+          );
+        }
       });
       formItems.push(
         <div className="arg-group" key={k}>
@@ -199,7 +224,11 @@ ArgsForm.propTypes = {
     })
   ).isRequired,
   argsOrder: PropTypes.arrayOf(
-    PropTypes.arrayOf(PropTypes.string)
+    PropTypes.arrayOf(
+      PropTypes.oneOfType([
+        PropTypes.string, PropTypes.object
+      ])
+    )
   ).isRequired,
   argsEnabled: PropTypes.objectOf(PropTypes.bool),
   userguide: PropTypes.string.isRequired,
