@@ -146,6 +146,15 @@ export function setupAddPlugin(i18n) {
         // renaming or moving environments after they're created.
         const pluginEnvPrefix = upath.join(rootPrefix, `plugin_${Date.now()}`);
 
+        // Custom Schisto code to faciliate the invest-schisto plugins need to rely
+        // on and build an invest version not available on conda-forge
+        if (process.platform.startsWith('win')) {
+          logger.info('Windows detected, set GDAL env.');
+          process.env.NATCAP_INVEST_GDAL_LIB_PATH = `${pluginEnvPrefix}/Library`;
+          logger.info('Windows NatCap GDAL env:');
+          logger.info(process.env.NATCAP_INVEST_GDAL_LIB_PATH);
+        }
+
         // Create environment from a YML file so that we can specify nodefaults
         // which is needed for licensing reasons. micromamba does not support
         // disabling the default channel in the command line.
