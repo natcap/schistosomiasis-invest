@@ -1494,6 +1494,8 @@ class ModelSpec(BaseModel):
     Example: ``"https://github.com/natcap/invest-demo-plugin/blob/main/README.md"``
     """
 
+    # Custom Schisto change to allow for embedded dictionaries to facilitate
+    # extended UI form functionality
     #input_field_order: list[list[str]]
     input_field_order: typing.Any
     """A list that specifies the order and grouping of model inputs.
@@ -1538,6 +1540,7 @@ class ModelSpec(BaseModel):
         found_keys = set()
         for group in self.input_field_order:
             for key in group:
+                # Custom Schisto functionality to handle embedded dict types
                 if isinstance(key, dict):
                     dict_key = list(key.keys())[0]
                     for val_key in key[dict_key]:
