@@ -1494,7 +1494,10 @@ class ModelSpec(BaseModel):
     Example: ``"https://github.com/natcap/invest-demo-plugin/blob/main/README.md"``
     """
 
-    input_field_order: list[list[str]]
+    # Custom Schisto change to allow for embedded dictionaries to facilitate
+    # extended UI form functionality
+    #input_field_order: list[list[str]]
+    input_field_order: typing.Any
     """A list that specifies the order and grouping of model inputs.
     Inputs will be displayed in the input form from top to bottom in the order
     listed here. Sub-lists represent groups of inputs that will be visually
@@ -1537,10 +1540,19 @@ class ModelSpec(BaseModel):
         found_keys = set()
         for group in self.input_field_order:
             for key in group:
-                if key in found_keys:
-                    raise ValueError(
-                        f'Key {key} appears more than once in input_field_order')
-                found_keys.add(key)
+                # Custom Schisto functionality to handle embedded dict types
+                if isinstance(key, dict):
+                    dict_key = list(key.keys())[0]
+                    for val_key in key[dict_key]:
+                        if val_key in found_keys:
+                            raise ValueError(
+                                f'Key {val_key} appears more than once in input_field_order')
+                        found_keys.add(val_key)
+                else:
+                    if key in found_keys:
+                        raise ValueError(
+                            f'Key {key} appears more than once in input_field_order')
+                    found_keys.add(key)
         for _input in self.inputs:
             if _input.hidden is True:
                 if _input.id in found_keys:
