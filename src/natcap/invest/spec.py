@@ -1102,8 +1102,10 @@ class RatioInput(NumberInput):
 class PercentInput(NumberInput):
     """A percent input, or parameter, of an invest model.
 
-    A percent is a proportion expressed as a value from 0 to 100 (in contrast to
-    a ratio, which ranges from 0 to 1). Values are restricted to the range [0, 100].
+    A percent is a proportion expressed as a value from 0% to 100% (in contrast
+    to a ratio, which ranges from 0 to 1). By default there is no restriction on
+    the range a percent value can take, so values may be less than 0 or greater
+    than 100. Use the ``expression`` parameter to enforce a value range.
     """
     type: typing.ClassVar[str] = 'percent'
 
@@ -1121,11 +1123,6 @@ class PercentInput(NumberInput):
         message = super().validate(value)
         if message:
             return message
-        as_float = float(value)
-        if as_float < 0 or as_float > 100:
-            return get_message('NOT_WITHIN_RANGE').format(
-                value=as_float,
-                range='[0, 100]')
 
 
 class BooleanInput(Input):
@@ -1567,6 +1564,10 @@ class ModelSpec(BaseModel):
     def get_input(self, key: str) -> Input:
         """Get an Input of this model by its key."""
         return {_input.id: _input for _input in self.inputs}[key]
+
+    def get_output(self, key: str) -> Output:
+        """Get an Output of this model by its key."""
+        return {_output.id: _output for _output in self.outputs}[key]
 
     def to_json(self):
         """Serialize an MODEL_SPEC dict to a JSON string.

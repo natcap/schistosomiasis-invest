@@ -62,9 +62,45 @@
 
 
 
-..
-  Unreleased Changes
-  ------------------
+Unreleased Changes
+------------------
+
+General
+=======
+* Added a `ModelSpec.get_output` method to access items in `ModelSpec.outputs`
+  using the `id` property of the `Output`.
+  (`#2138 <https://github.com/natcap/invest/issues/2138>`_)
+
+Plugins
+=======
+* Fixed a bug where some errors during plugin installation would crash
+  the Workbench. Specifically, if the plugin was installed but could not
+  import. (`#2071 <https://github.com/natcap/invest/issues/2071>`_)
+* If plugin installation fails, the Workbench now cleans up any
+  leftover, unusable micromamba environments.
+  (`#2104 <https://github.com/natcap/invest/issues/2104>`_)
+
+Annual Water Yield
+==================
+* The discount rate parameter was previously incorrectly restricted to the
+  range [0, 100]. Now there is no minimum or maximum value.
+
+Carbon
+======
+* The discount rate and price change parameters were previously incorrectly
+  restricted to the range [0, 100]. Now there is no minimum or maximum value.
+
+Coastal Blue Carbon
+===================
+* The discount rate and price change parameters were previously incorrectly
+  restricted to the range [0, 100]. Now there is no minimum or maximum value.
+
+Coastal Vulnerability
+=====================
+* The WWIII ``v10pct_[SECTOR]`` field was incorrectly documented as a unitless
+  percent; this has been corrected to show that it is a numeric input with
+  units of meters/second.
+
 
 3.16.2 (2025-08-13)
 -------------------
