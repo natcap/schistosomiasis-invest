@@ -113,63 +113,6 @@ class UNATests(unittest.TestCase):
         """Override tearDown function to remove temporary directory."""
         shutil.rmtree(self.workspace_dir)
 
-    def test_resample_population_raster(self):
-        """UNA: Test population raster resampling."""
-        from natcap.invest import urban_nature_access
-
-        random.seed(-1)  # for our random number generation
-
-        source_population_raster_path = os.path.join(
-            self.workspace_dir, 'population.tif')
-        population_pixel_size = (90, -90)
-        population_array_shape = (10, 10)
-
-        array_of_100s = numpy.full(
-            population_array_shape, 100, dtype=numpy.uint32)
-        array_of_random_ints = numpy.array(
-            random.choices(range(0, 100), k=100),
-            dtype=numpy.uint32).reshape(population_array_shape)
-
-        for population_array in (
-                array_of_100s, array_of_random_ints):
-            population_srs = osr.SpatialReference()
-            population_srs.ImportFromEPSG(_DEFAULT_EPSG)
-            population_wkt = population_srs.ExportToWkt()
-            pygeoprocessing.numpy_array_to_raster(
-                base_array=population_array,
-                target_nodata=-1,
-                pixel_size=population_pixel_size,
-                origin=_DEFAULT_ORIGIN,
-                projection_wkt=population_wkt,
-                target_path=source_population_raster_path)
-
-            for target_pixel_size in (
-                    (30, -30),  # 1/3 the pixel size
-                    (4, -4),  # way smaller
-                    (100, -100)):  # bigger
-                target_population_raster_path = os.path.join(
-                    self.workspace_dir, 'resampled_population.tif')
-                urban_nature_access._resample_population_raster(
-                    source_population_raster_path,
-                    target_population_raster_path,
-                    lulc_pixel_size=target_pixel_size,
-                    lulc_bb=pygeoprocessing.get_raster_info(
-                        source_population_raster_path)['bounding_box'],
-                    lulc_projection_wkt=population_wkt,
-                    working_dir=os.path.join(self.workspace_dir, 'working'))
-
-                resampled_population_array = (
-                    pygeoprocessing.raster_to_numpy_array(
-                        target_population_raster_path))
-
-                # There should be no significant loss or gain of population due
-                # to warping, but the fact that this is aggregating across the
-                # whole raster (lots of pixels) means we need to lower the
-                # relative tolerance.
-                numpy.testing.assert_allclose(
-                    population_array.sum(), resampled_population_array.sum(),
-                    rtol=1e-3)
-
     def test_density_kernel(self):
         """UNA: Test the density kernel."""
         from natcap.invest import urban_nature_access
@@ -760,13 +703,15 @@ class UNATests(unittest.TestCase):
             urban_nature_access.execute(args)
 
             # make sure the output dir contains the correct files.
-            for output_filename in (
-                    urban_nature_access._OUTPUT_BASE_FILES.values()):
-                basename, ext = os.path.splitext(
-                    os.path.basename(output_filename))
+            for output_filename in ['urban_nature_supply_percapita.tif',
+                                    'admin_boundaries.gpkg',
+                                    'urban_nature_balance_percapita.tif',
+                                    'urban_nature_balance_totalpop.tif',
+                                    'urban_nature_demand.tif']:
+                basename, ext = os.path.splitext(output_filename)
                 suffix = args['results_suffix']
-                filepath = os.path.join(args['workspace_dir'], 'output',
-                                        f'{basename}_{suffix}{ext}')
+                filepath = os.path.join(
+                    args['workspace_dir'], 'output', f'{basename}_{suffix}{ext}')
                 self.assertTrue(os.path.exists(filepath))
 
             # check the urban_nature demand raster
@@ -1006,28 +951,18 @@ class UNATests(unittest.TestCase):
         args = _build_model_args(self.workspace_dir)
 
         # Rewrite the lulc attribute table to use proportions of urban nature.
-        with open(args['lulc_attribute_table'], 'w') as attr_table:
-            attr_table.write(textwrap.dedent(
-                """\
-                lucode,urban_nature,search_radius_m
-                0,0,100
-                1,0.1,100
-                2,0,100
-                3,0.3,100
-                4,0,100
-                5,0.5,100
-                6,0,100
-                7,0.7,100
-                8,0,100
-                9,0.9,100
-                """))
+        attr_table = pandas.DataFrame({
+            'lucode': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            'urban_nature': [0, 0.1, 0, 0.3, 0, 0.5, 0, 0.7, 0, 0.9],
+            'search_radius_m': [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+        })
 
         urban_nature_area_path = os.path.join(
             self.workspace_dir, 'urban_nature_area.tif')
 
         for limit_to_lucodes in (None, set([1, 3])):
             urban_nature_access._reclassify_urban_nature_area(
-                args['lulc_raster_path'], args['lulc_attribute_table'],
+                args['lulc_raster_path'], attr_table,
                 urban_nature_area_path,
                 only_these_urban_nature_codes=limit_to_lucodes)
 
@@ -1061,7 +996,7 @@ class UNATests(unittest.TestCase):
     def test_validate_uniform_search_radius(self):
         """UNA: Search radius is required when using uniform search radii."""
         from natcap.invest import urban_nature_access
-        from natcap.invest import validation
+        from natcap.invest import validation_messages
 
         args = _build_model_args(self.workspace_dir)
         args['search_radius_mode'] = urban_nature_access.RADIUS_OPT_UNIFORM
@@ -1069,4 +1004,4 @@ class UNATests(unittest.TestCase):
 
         warnings = urban_nature_access.validate(args)
         self.assertEqual(warnings, [(['search_radius'],
-                                     validation.MESSAGES['MISSING_VALUE'])])
+                                     validation_messages.MISSING_VALUE)])

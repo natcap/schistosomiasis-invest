@@ -42,6 +42,7 @@ MODEL_SPEC = spec.ModelSpec(
     validate_spatial_overlap=["aoi_vector_path", "lulc_raster_path"],
     different_projections_ok=False,
     aliases=("fc",),
+    module_name=__name__,
     input_field_order=[
         ["workspace_dir", "results_suffix"],
         ["lulc_raster_path", "biophysical_table_path", "pools_to_calculate"],
@@ -57,20 +58,20 @@ MODEL_SPEC = spec.ModelSpec(
         spec.WORKSPACE,
         spec.SUFFIX,
         spec.N_WORKERS,
-        spec.NumberInput(
+        spec.IntegerInput(
             id="n_nearest_model_points",
             name=gettext("number of points to average"),
             about=(
                 "Number of closest regression models that are used when calculating the"
                 " total biomass. Each local model is linearly weighted by distance such"
                 " that the pixel's biomass is a function of each of these points with the"
-                " closest point having the largest effect. Must be an integer greater"
-                " than 0. Required if Compute Forest Edge Effects is selected."
+                " closest point having the largest effect. Must be greater than 0."
+                " Required if Compute Forest Edge Effects is selected."
             ),
             required="compute_forest_edge_effects",
             allowed="compute_forest_edge_effects",
             units=u.none,
-            expression="value > 0 and value.is_integer()"
+            expression="value > 0"
         ),
         spec.AOI.model_copy(update=dict(
             id="aoi_vector_path",
@@ -128,7 +129,8 @@ MODEL_SPEC = spec.ModelSpec(
                     units=u.metric_ton / u.hectare
                 )
             ],
-            index_col="lucode"
+            index_col="lucode",
+            na_allowed=["c_above"]
         ),
         spec.SingleBandRasterInput(
             id="lulc_raster_path",
@@ -260,7 +262,7 @@ MODEL_SPEC = spec.ModelSpec(
                 "Carbon stored in the aboveground biomass carbon pool."
             ),
             data_type=float,
-            units=u.metric_ton
+            units=u.metric_ton / u.hectare
         ),
         spec.SingleBandRasterOutput(
             id="c_below_carbon_stocks",
@@ -269,7 +271,7 @@ MODEL_SPEC = spec.ModelSpec(
                 "Carbon stored in the belowground biomass carbon pool."
             ),
             data_type=float,
-            units=u.metric_ton
+            units=u.metric_ton / u.hectare
         ),
         spec.SingleBandRasterOutput(
             id="c_dead_carbon_stocks",
@@ -278,14 +280,14 @@ MODEL_SPEC = spec.ModelSpec(
                 "Carbon stored in the dead matter biomass carbon pool."
             ),
             data_type=float,
-            units=u.metric_ton
+            units=u.metric_ton / u.hectare
         ),
         spec.SingleBandRasterOutput(
             id="c_soil_carbon_stocks",
             path="intermediate_outputs/c_soil_carbon_stocks.tif",
             about=gettext("Carbon stored in the soil biomass carbon pool."),
             data_type=float,
-            units=u.metric_ton
+            units=u.metric_ton / u.hectare
         ),
         spec.VectorOutput(
             id="local_carbon_shape",
@@ -324,6 +326,22 @@ MODEL_SPEC = spec.ModelSpec(
             ),
             geometry_types={"POLYGON", "MULTIPOLYGON"},
             fields=[]
+        ),
+        spec.SingleBandRasterOutput(
+            id="non_forest_mask",
+            path="intermediate_outputs/non_forest_mask.tif",
+            about=gettext(
+                "A mask raster where non-forest pixels are marked as 1 and forest pixels as 0."
+            ),
+            data_type=int,
+            units=None
+        ),
+        spec.FileOutput(
+            id="spatial_index_pickle",
+            path="intermediate_outputs/spatial_index.pickle",
+            about=gettext(
+                "A pickle file containing the spatial index (kd-tree and model parameters) for forest edge regression."
+            )
         ),
         spec.TASKGRAPH_CACHE
     ]
@@ -416,12 +434,14 @@ def execute(args):
             place in the current process.
 
     Returns:
-        None
+        File registry dictionary mapping MODEL_SPEC output ids to absolute paths
 
     """
+    args, file_registry, task_graph = MODEL_SPEC.setup(args)
+
     # just check that the AOI exists since it wouldn't crash until the end of
     # the whole model run if it didn't.
-    if 'aoi_vector_path' in args and args['aoi_vector_path'] != '':
+    if args['aoi_vector_path']:
         lulc_raster_bb = pygeoprocessing.get_raster_info(
             args['lulc_raster_path'])['bounding_box']
         aoi_vector_bb = pygeoprocessing.get_vector_info(
@@ -435,61 +455,12 @@ def execute(args):
                 f"The landcover raster {args['lulc_raster_path']} and AOI "
                 f"{args['aoi_vector_path']} do not touch each other.")
 
-    output_dir = args['workspace_dir']
-    intermediate_dir = os.path.join(
-        args['workspace_dir'], 'intermediate_outputs')
-    utils.make_directories([output_dir, intermediate_dir])
-    file_suffix = utils.make_suffix_string(args, 'results_suffix')
-
-    # Initialize a TaskGraph
-    try:
-        n_workers = int(args['n_workers'])
-    except (KeyError, ValueError, TypeError):
-        # KeyError when n_workers is not present in args
-        # ValueError when n_workers is an empty string.
-        # TypeError when n_workers is None.
-        n_workers = -1  # single process mode.
-    task_graph = taskgraph.TaskGraph(
-        os.path.join(args['workspace_dir'], 'taskgraph_cache'), n_workers)
-
-    # used to keep track of files generated by this module
-    output_file_registry = {
-        'c_above_map': os.path.join(
-            intermediate_dir, f'c_above_carbon_stocks{file_suffix}.tif'),
-        'carbon_map': os.path.join(
-            output_dir, f'carbon_map{file_suffix}.tif'),
-        'aggregated_result_vector': os.path.join(
-            output_dir, f'aggregated_carbon_stocks{file_suffix}.shp')
-    }
-
-    if args['pools_to_calculate'] == 'all':
-        output_file_registry['c_below_map'] = os.path.join(
-            intermediate_dir, f'c_below_carbon_stocks{file_suffix}.tif')
-        output_file_registry['c_soil_map'] = os.path.join(
-            intermediate_dir, f'c_soil_carbon_stocks{file_suffix}.tif')
-        output_file_registry['c_dead_map'] = os.path.join(
-            intermediate_dir, f'c_dead_carbon_stocks{file_suffix}.tif')
-
-    if args['compute_forest_edge_effects']:
-        output_file_registry['spatial_index_pickle'] = os.path.join(
-            intermediate_dir, f'spatial_index{file_suffix}.pickle')
-        output_file_registry['edge_distance'] = os.path.join(
-            intermediate_dir, f'edge_distance{file_suffix}.tif')
-        output_file_registry['tropical_forest_edge_carbon_map'] = os.path.join(
-            intermediate_dir,
-            f'tropical_forest_edge_carbon_stocks{file_suffix}.tif')
-        output_file_registry['non_forest_mask'] = os.path.join(
-            intermediate_dir, f'non_forest_mask{file_suffix}.tif')
-        output_file_registry['tropical_forest_edge_clipped'] = os.path.join(
-            intermediate_dir,
-            f'regression_model_params_clipped{file_suffix}.shp')
-
     # Map non-forest landcover codes to carbon biomasses
     LOGGER.info('Calculating direct mapped carbon stocks')
     carbon_maps = []
     biophysical_df = MODEL_SPEC.get_input(
         'biophysical_table_path').get_validated_dataframe(
-        args['biophysical_table_path'])
+        args['biophysical_table_path'], args=args)
     pool_list = [('c_above', True)]
     if args['pools_to_calculate'] == 'all':
         pool_list.extend([
@@ -497,13 +468,16 @@ def execute(args):
     for carbon_pool_type, ignore_tropical_type in pool_list:
         if carbon_pool_type in biophysical_df.columns:
             carbon_maps.append(
-                output_file_registry[carbon_pool_type+'_map'])
+                file_registry[f'{carbon_pool_type}_carbon_stocks'])
             task_graph.add_task(
                 func=_calculate_lulc_carbon_map,
-                args=(args['lulc_raster_path'], args['biophysical_table_path'],
+                args=(args['lulc_raster_path'],
+                      biophysical_df,
                       carbon_pool_type, ignore_tropical_type,
-                      args['compute_forest_edge_effects'], carbon_maps[-1]),
-                target_path_list=[carbon_maps[-1]],
+                      args['compute_forest_edge_effects'],
+                      file_registry[f'{carbon_pool_type}_carbon_stocks']),
+                target_path_list=[
+                    file_registry[f'{carbon_pool_type}_carbon_stocks']],
                 task_name=f'calculate_lulc_{carbon_pool_type}_map')
 
     if args['compute_forest_edge_effects']:
@@ -512,11 +486,12 @@ def execute(args):
         LOGGER.info('Calculating distance from forest edge')
         map_distance_task = task_graph.add_task(
             func=_map_distance_from_tropical_forest_edge,
-            args=(args['lulc_raster_path'], args['biophysical_table_path'],
-                  output_file_registry['edge_distance'],
-                  output_file_registry['non_forest_mask']),
-            target_path_list=[output_file_registry['edge_distance'],
-                              output_file_registry['non_forest_mask']],
+            args=(args['lulc_raster_path'],
+                  biophysical_df,
+                  file_registry['edge_distance'],
+                  file_registry['non_forest_mask']),
+            target_path_list=[file_registry['edge_distance'],
+                              file_registry['non_forest_mask']],
             task_name='map_distance_from_forest_edge')
 
         # Clip global regression model vector to LULC raster bounding box
@@ -525,18 +500,19 @@ def execute(args):
             func=_clip_global_regression_models_vector,
             args=(args['lulc_raster_path'],
                   args['tropical_forest_edge_carbon_model_vector_path'],
-                  output_file_registry['tropical_forest_edge_clipped']),
-            target_path_list=[output_file_registry['tropical_forest_edge_clipped']],
+                  file_registry['regression_model_params_clipped']),
+            target_path_list=[file_registry['regression_model_params_clipped']],
             task_name='clip_forest_edge_carbon_vector')
 
         # Build spatial index for gridded global model for closest 3 points
         LOGGER.info('Building spatial index for forest edge models.')
         build_spatial_index_task = task_graph.add_task(
             func=_build_spatial_index,
-            args=(args['lulc_raster_path'], intermediate_dir,
-                  output_file_registry['tropical_forest_edge_clipped'],
-                  output_file_registry['spatial_index_pickle']),
-            target_path_list=[output_file_registry['spatial_index_pickle']],
+            args=(args['lulc_raster_path'],
+                  file_registry['local_carbon_shape'],
+                  file_registry['regression_model_params_clipped'],
+                  file_registry['spatial_index_pickle']),
+            target_path_list=[file_registry['spatial_index_pickle']],
             task_name='build_spatial_index',
             dependent_task_list=[clip_forest_edge_carbon_vector_task])
 
@@ -544,23 +520,22 @@ def execute(args):
         LOGGER.info('Calculating forest edge carbon')
         task_graph.add_task(
             func=_calculate_tropical_forest_edge_carbon_map,
-            args=(output_file_registry['edge_distance'],
-                  output_file_registry['spatial_index_pickle'],
-                  int(args['n_nearest_model_points']),
-                  float(args['biomass_to_carbon_conversion_factor']),
-                  output_file_registry['tropical_forest_edge_carbon_map']),
+            args=(file_registry['edge_distance'],
+                  file_registry['spatial_index_pickle'],
+                  args['n_nearest_model_points'],
+                  args['biomass_to_carbon_conversion_factor'],
+                  file_registry['tropical_forest_edge_carbon_stocks']),
             target_path_list=[
-                output_file_registry['tropical_forest_edge_carbon_map']],
+                file_registry['tropical_forest_edge_carbon_stocks']],
             task_name='calculate_forest_edge_carbon_map',
             dependent_task_list=[map_distance_task, build_spatial_index_task])
 
         # This is also a carbon stock
         carbon_maps.append(
-            output_file_registry['tropical_forest_edge_carbon_map'])
+            file_registry['tropical_forest_edge_carbon_stocks'])
 
     # combine maps into a single output
     LOGGER.info('combining carbon maps into single raster')
-
     carbon_maps_band_list = [(path, 1) for path in carbon_maps]
 
     # Join here since the raster calculation depends on the target datasets
@@ -570,20 +545,21 @@ def execute(args):
     combine_carbon_maps_task = task_graph.add_task(
         func=pygeoprocessing.raster_calculator,
         args=(carbon_maps_band_list, combine_carbon_maps,
-              output_file_registry['carbon_map'], gdal.GDT_Float32,
+              file_registry['carbon_map'], gdal.GDT_Float32,
               NODATA_VALUE),
-        target_path_list=[output_file_registry['carbon_map']],
+        target_path_list=[file_registry['carbon_map']],
         task_name='combine_carbon_maps')
 
     # generate report (optional) by aoi if they exist
-    if 'aoi_vector_path' in args and args['aoi_vector_path'] != '':
+    if args['aoi_vector_path']:
         LOGGER.info('aggregating carbon map by aoi')
         task_graph.add_task(
             func=_aggregate_carbon_map,
-            args=(args['aoi_vector_path'], output_file_registry['carbon_map'],
-                  output_file_registry['aggregated_result_vector']),
+            args=(args['aoi_vector_path'],
+                  file_registry['carbon_map'],
+                  file_registry['aggregated_carbon_stocks']),
             target_path_list=[
-                output_file_registry['aggregated_result_vector']],
+                file_registry['aggregated_carbon_stocks']],
             task_name='combine_carbon_maps',
             dependent_task_list=[combine_carbon_maps_task])
 
@@ -690,14 +666,14 @@ def _aggregate_carbon_map(
 
 
 def _calculate_lulc_carbon_map(
-        lulc_raster_path, biophysical_table_path, carbon_pool_type,
+        lulc_raster_path, biophysical_df, carbon_pool_type,
         ignore_tropical_type, compute_forest_edge_effects, carbon_map_path):
     """Calculates the carbon on the map from non-forest landcover types only.
 
     Args:
         lulc_raster_path (string): a filepath to the landcover map that
             contains integer landcover codes
-        biophysical_table_path (string): a filepath to a csv table that indexes
+        biophysical_df (pandas.DataFrame): a dataframe that indexes
             landcover codes to surface carbon, contains at least the fields
             'lucode' (landcover integer code), 'is_tropical_forest' (0 or 1
             depending on landcover code type), and 'c_above' (carbon density in
@@ -717,9 +693,6 @@ def _calculate_lulc_carbon_map(
 
     """
     # classify forest pixels from lulc
-    biophysical_df = MODEL_SPEC.get_input(
-        'biophysical_table_path').get_validated_dataframe(biophysical_table_path)
-
     lucode_to_per_cell_carbon = {}
 
     # Build a lookup table
@@ -752,7 +725,7 @@ def _calculate_lulc_carbon_map(
 
 
 def _map_distance_from_tropical_forest_edge(
-        base_lulc_raster_path, biophysical_table_path, edge_distance_path,
+        base_lulc_raster_path, biophysical_df, edge_distance_path,
         target_non_forest_mask_path):
     """Generates a raster of forest edge distances.
 
@@ -762,7 +735,7 @@ def _map_distance_from_tropical_forest_edge(
     Args:
         base_lulc_raster_path (string): path to the landcover raster that
             contains integer landcover codes
-        biophysical_table_path (string): path to a csv table that indexes
+        biophysical_df (pandas.DataFrame): a dataframe that indexes
             landcover codes to forest type, contains at least the fields
             'lucode' (landcover integer code) and 'is_tropical_forest' (0 or 1
             depending on landcover code type)
@@ -777,9 +750,6 @@ def _map_distance_from_tropical_forest_edge(
 
     """
     # Build a list of forest lucodes
-    biophysical_df = MODEL_SPEC.get_input(
-        'biophysical_table_path').get_validated_dataframe(
-        biophysical_table_path)
     forest_codes = biophysical_df[biophysical_df['is_tropical_forest']].index.values
 
     # Make a raster where 1 is non-forest landcover types and 0 is forest
@@ -908,7 +878,7 @@ def _clip_global_regression_models_vector(
 
 
 def _build_spatial_index(
-        base_raster_path, local_model_dir,
+        base_raster_path, carbon_model_reproject_path,
         tropical_forest_edge_carbon_model_vector_path,
         target_spatial_index_pickle_path):
     """Build a kd-tree index.
@@ -919,10 +889,8 @@ def _build_spatial_index(
     Args:
         base_raster_path (string): path to a raster that is used to define the
             bounding box and projection of the local model.
-        local_model_dir (string): path to a directory where we can write a
+        carbon_model_reproject_path (string): path at which to create the
             shapefile of the locally projected global data model grid.
-            Function will create a file called 'local_carbon_shape.shp' in
-            that location and overwrite one if it exists.
         tropical_forest_edge_carbon_model_vector_path (string): a path to an
             OGR shapefile that has the parameters for the global carbon edge
             model. Each georeferenced feature should have fields 'theta1',
@@ -939,8 +907,6 @@ def _build_spatial_index(
 
     """
     # Reproject the global model into local coordinate system
-    carbon_model_reproject_path = os.path.join(
-        local_model_dir, 'local_carbon_shape.shp')
     lulc_projection_wkt = pygeoprocessing.get_raster_info(
         base_raster_path)['projection_wkt']
 
@@ -1191,9 +1157,4 @@ def validate(args, limit_to=None):
             be an empty list if validation succeeds.
 
     """
-    model_spec = copy.deepcopy(MODEL_SPEC)
-    if 'pools_to_calculate' in args and args['pools_to_calculate'] == 'all':
-        model_spec.get_input('biophysical_table_path').get_column('c_below').required = True
-        model_spec.get_input('biophysical_table_path').get_column('c_soil').required = True
-        model_spec.get_input('biophysical_table_path').get_column('c_dead').required = True
-    return validation.validate(args, model_spec)
+    return validation.validate(args, MODEL_SPEC)

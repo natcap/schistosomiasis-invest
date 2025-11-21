@@ -1,11 +1,11 @@
 import os
 import shutil
 import tempfile
-import types
 import unittest
 
 import geometamaker
 from natcap.invest import spec
+from natcap.invest.file_registry import FileRegistry
 from natcap.invest.unit_registry import u
 from osgeo import gdal
 from osgeo import ogr
@@ -126,10 +126,10 @@ class TestDescribeArgFromSpec(unittest.TestCase):
         out = spec.describe_arg_from_spec(option_spec.name, option_spec)
         expected_rst = ([
             '**Bar** (`option <input_types.html#option>`__, *required*): Description',
-            '\tOptions:',
-            '\t- A',
-            '\t- c: do something else',
-            '\t- Option_b: do something'
+            '\tValues must be one of the following text strings:',
+            '\t- "**A**"',
+            '\t- "**c**": do something else',
+            '\t- "**Option_b**": do something'
         ])
         self.assertEqual(repr(out), repr(expected_rst))
 
@@ -271,16 +271,14 @@ class TestDescribeArgFromSpec(unittest.TestCase):
         self.assertEqual(repr(out), repr(expected_rst))
 
 
-def _generate_files_from_spec(output_spec, workspace):
+def _fake_execute(output_spec, workspace):
     """A utility function to support the metadata test."""
+    file_registry = FileRegistry(output_spec, workspace, '')
     for spec_data in output_spec:
-        filepath = os.path.join(workspace, spec_data.path)
-        filedir = os.path.dirname(filepath)
-        try:
-            os.makedirs(filedir)
-        except OSError:
-            if not os.path.isdir(filedir):
-                raise
+        reg_key = spec_data.id
+        if '[' in spec_data.id:
+            reg_key = (spec_data.id, 'A')
+        filepath = file_registry[reg_key]
         if isinstance(spec_data, spec.SingleBandRasterOutput):
             driver = gdal.GetDriverByName('GTIFF')
             raster = driver.Create(filepath, 2, 2, 1, gdal.GDT_Byte)
@@ -302,6 +300,7 @@ def _generate_files_from_spec(output_spec, workspace):
             # Such as taskgraph.db, just create the file.
             with open(filepath, 'w') as file:
                 pass
+    return file_registry.registry
 
 
 class TestMetadataFromSpec(unittest.TestCase):
@@ -354,8 +353,8 @@ class TestMetadataFromSpec(unittest.TestCase):
                 ]
             ),
             spec.SingleBandRasterOutput(
-                id="mask",
-                path="intermediate/mask.tif",
+                id="mask_[A]",  # testing with a pattern
+                path="intermediate/mask_[A].tif",
                 about="A mask for the final raster output.",
                 data_type=float,
                 units=u.m**2
@@ -364,32 +363,155 @@ class TestMetadataFromSpec(unittest.TestCase):
                 path="intermediate/taskgraph_cache/taskgraph.db")
             )
         ]
+
+        model_spec = spec.ModelSpec(
+            model_id='urban_nature_access',
+            model_title='Urban Nature Access',
+            userguide='',
+            aliases=[],
+            input_field_order=[],
+            inputs=[],
+            module_name='',
+            outputs=output_spec
+        )
+        
         # Generate an output workspace with real files, without
         # running an invest model.
-        _generate_files_from_spec(output_spec, self.workspace_dir)
-
-        model_module = types.SimpleNamespace(
-            __name__='urban_nature_access',
-            execute=lambda: None,
-            MODEL_SPEC=spec.ModelSpec(
-                model_id='urban_nature_access',
-                model_title='Urban Nature Access',
-                userguide='',
-                aliases=[],
-                input_field_order=[],
-                inputs=[],
-                outputs=output_spec
-            )
-        )
         args_dict = {'workspace_dir': self.workspace_dir}
-        spec.generate_metadata_for_outputs(model_module, args_dict)
+        model_spec.create_output_directories(args_dict)
+        file_registry = _fake_execute(model_spec.outputs, self.workspace_dir)
+        model_spec.generate_metadata_for_outputs(file_registry, args_dict)
 
         files, messages = geometamaker.validate_dir(self.workspace_dir)
         self.assertEqual(len(files), 4)
         self.assertFalse(any(messages))
 
+        # Test some specific content of the metadata
+        vector_spec = model_spec.get_output('admin_boundaries')
         resource = geometamaker.describe(
-            os.path.join(args_dict['workspace_dir'], 'output',
-                         'urban_nature_supply_percapita.tif'))
-        self.assertCountEqual(resource.get_keywords(),
-                              [model_module.MODEL_SPEC.model_id, 'InVEST'])
+            os.path.join(self.workspace_dir, vector_spec.path))
+        self.assertCountEqual(
+            resource.get_keywords(),
+            [model_spec.model_id, 'InVEST'])
+        self.assertEqual(
+            resource.get_field_description('SUP_DEMadm_cap').description,
+            vector_spec.get_field('SUP_DEMadm_cap').about)
+        self.assertEqual(
+            resource.get_field_description('SUP_DEMadm_cap').units,
+            spec.format_unit(vector_spec.get_field('SUP_DEMadm_cap').units))
+
+
+class ResultsSuffixTests(unittest.TestCase):
+    """Tests for natcap.invest.spec.ResultsSuffixInput."""
+
+    def test_suffix_string(self):
+        """Utils: test suffix_string."""
+        self.assertEqual(spec.SUFFIX.preprocess('suff'), '_suff')
+
+    def test_suffix_string_underscore(self):
+        """Utils: test suffix_string underscore."""
+        self.assertEqual(spec.SUFFIX.preprocess('_suff'), '_suff')
+
+    def test_suffix_string_empty(self):
+        """Utils: test empty suffix_string."""
+        self.assertEqual(spec.SUFFIX.preprocess(''), '')
+
+    def test_suffix_string_no_entry(self):
+        """Utils: test no suffix entry in args."""
+        self.assertEqual(spec.SUFFIX.preprocess(None), '')
+
+
+class InputTests(unittest.TestCase):
+    """Tests for natcap.invest.spec.Input and subclasses."""
+
+    def test_raster_input_preprocess(self):
+        """Test SingleBandRasterInput.preprocess method"""
+        raster_input = spec.RasterInput(
+            id="foo",
+            bands=[spec.RasterBand(units=None)])
+        self.assertEqual(raster_input.preprocess('foo/bar.tif'), 'foo/bar.tif')
+        self.assertEqual(
+            raster_input.preprocess('zip+https://storage.googleapis.com/foo/bar.tif'),
+            '/vsizip/vsicurl/https://storage.googleapis.com/foo/bar.tif')
+        self.assertEqual(raster_input.preprocess(''), None)
+        self.assertEqual(raster_input.preprocess(None), None)
+
+    def test_single_band_raster_input_preprocess(self):
+        """Test SingleBandRasterInput.preprocess method"""
+        raster_input = spec.SingleBandRasterInput(
+            id="foo",
+            data_type=int,
+            units=None)
+        self.assertEqual(raster_input.preprocess('foo/bar.tif'), 'foo/bar.tif')
+        self.assertEqual(
+            raster_input.preprocess('zip+https://storage.googleapis.com/foo/bar.tif'),
+            '/vsizip/vsicurl/https://storage.googleapis.com/foo/bar.tif')
+        self.assertEqual(raster_input.preprocess(''), None)
+        self.assertEqual(raster_input.preprocess(None), None)
+
+    def test_vector_input_preprocess(self):
+        """Test VectorInput.preprocess method"""
+        vector_input = spec.VectorInput(
+            id="foo",
+            geometry_types={"POLYGON"},
+            fields=[])
+        self.assertEqual(vector_input.preprocess('foo/bar.gpkg'), 'foo/bar.gpkg')
+        self.assertEqual(
+            vector_input.preprocess('zip+https://storage.googleapis.com/foo/bar.gpkg'),
+            '/vsizip/vsicurl/https://storage.googleapis.com/foo/bar.gpkg')
+        self.assertEqual(vector_input.preprocess(''), None)
+        self.assertEqual(vector_input.preprocess(None), None)
+
+    def test_csv_input_preprocess(self):
+        """Test CSVInput.preprocess method"""
+        csv_input = spec.CSVInput(
+            id="foo")
+        self.assertEqual(csv_input.preprocess('foo/bar.csv'), 'foo/bar.csv')
+        self.assertEqual(
+            csv_input.preprocess('https://storage.googleapis.com/foo/bar.csv'),
+            'https://storage.googleapis.com/foo/bar.csv')
+        self.assertEqual(csv_input.preprocess(''), None)
+        self.assertEqual(csv_input.preprocess(None), None)
+
+    def test_number_input_preprocess(self):
+        """Test NumberInput.preprocess method"""
+        number_input = spec.NumberInput(id='foo', units=None)
+        self.assertEqual(number_input.preprocess(1.5), 1.5)
+        self.assertEqual(number_input.preprocess('1.5'), 1.5)
+        self.assertEqual(number_input.preprocess(0), 0)
+        self.assertEqual(number_input.preprocess(''), None)
+        self.assertEqual(number_input.preprocess(None), None)
+
+    def test_integer_input_preprocess(self):
+        """Test IntegerInput.preprocess method"""
+        integer_input = spec.IntegerInput(id='foo')
+        self.assertEqual(integer_input.preprocess(1), 1)
+        self.assertEqual(integer_input.preprocess('1'), 1)
+        self.assertEqual(integer_input.preprocess(0), 0)
+        self.assertEqual(integer_input.preprocess(''), None)
+        self.assertEqual(integer_input.preprocess(None), None)
+
+    def test_boolean_input_preprocess(self):
+        """Test BooleanInput.preprocess method"""
+        boolean_input = spec.BooleanInput(id='foo')
+        self.assertEqual(boolean_input.preprocess(False), False)
+        self.assertEqual(boolean_input.preprocess(True), True)
+        self.assertEqual(boolean_input.preprocess(''), None)
+        self.assertEqual(boolean_input.preprocess(None), None)
+
+    def test_string_input_preprocess(self):
+        """Test StringInput.preprocess method"""
+        string_input = spec.StringInput(id='foo')
+        self.assertEqual(string_input.preprocess('foo'), 'foo')
+        self.assertEqual(string_input.preprocess(1), '1')
+        self.assertEqual(string_input.preprocess(''), None)
+        self.assertEqual(string_input.preprocess(None), None)
+
+    def test_option_string_input_preprocess(self):
+        """Test StringInput.preprocess method"""
+        option_string_input = spec.OptionStringInput(
+            id='foo', options=[spec.Option(key='foo'), spec.Option(key='bar')])
+        self.assertEqual(option_string_input.preprocess('foo'), 'foo')
+        self.assertEqual(option_string_input.preprocess('Foo'), 'foo')
+        self.assertEqual(option_string_input.preprocess(''), None)
+        self.assertEqual(option_string_input.preprocess(None), None)

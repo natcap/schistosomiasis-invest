@@ -1,5 +1,4 @@
 """Common validation utilities for InVEST models."""
-import ast
 import copy
 import functools
 import importlib
@@ -17,99 +16,12 @@ from osgeo import osr
 
 from . import gettext
 from . import utils
+from . import validation_messages
 
 #: A flag to pass to the validation context manager indicating that all keys
 #: should be checked.
 CHECK_ALL_KEYS = None
 LOGGER = logging.getLogger(__name__)
-
-MESSAGES = {
-    'MISSING_KEY': gettext('Key is missing from the args dict'),
-    'MISSING_VALUE': gettext('Input is required but has no value'),
-    'MATCHED_NO_HEADERS': gettext(
-        'Expected the {header} "{header_name}" but did not find it'),
-    'PATTERN_MATCHED_NONE': gettext(
-        'Expected to find at least one {header} matching '
-        'the pattern "{header_name}" but found none'),
-    'DUPLICATE_HEADER': gettext(
-        'Expected the {header} "{header_name}" only once '
-        'but found it {number} times'),
-    'NOT_A_NUMBER': gettext(
-        'Value "{value}" could not be interpreted as a number'),
-    'WRONG_PROJECTION_UNIT': gettext(
-        'Layer must be projected in this unit: '
-        '"{unit_a}" but found this unit: "{unit_b}"'),
-    'UNEXPECTED_ERROR': gettext('An unexpected error occurred in validation'),
-    'DIR_NOT_FOUND': gettext('Directory not found'),
-    'NOT_A_DIR': gettext('Path must be a directory'),
-    'FILE_NOT_FOUND': gettext('File not found'),
-    'INVALID_PROJECTION': gettext('Dataset must have a valid projection.'),
-    'NOT_PROJECTED': gettext('Dataset must be projected in linear units.'),
-    'NOT_GDAL_RASTER': gettext('File could not be opened as a GDAL raster'),
-    'OVR_FILE': gettext('File found to be an overview ".ovr" file.'),
-    'NOT_GDAL_VECTOR': gettext('File could not be opened as a GDAL vector'),
-    'REGEXP_MISMATCH': gettext(
-        "Value did not match expected pattern {regexp}"),
-    'INVALID_OPTION': gettext("Value must be one of: {option_list}"),
-    'INVALID_VALUE': gettext('Value does not meet condition {condition}'),
-    'NOT_WITHIN_RANGE': gettext('Value {value} is not in the range {range}'),
-    'NOT_AN_INTEGER': gettext('Value "{value}" does not represent an integer'),
-    'NOT_BOOLEAN': gettext("Value must be either True or False, not {value}"),
-    'NO_PROJECTION': gettext('Spatial file {filepath} has no projection'),
-    'BBOX_NOT_INTERSECT': gettext(
-        'Not all of the spatial layers overlap each '
-        'other. All bounding boxes must intersect: {bboxes}'),
-    'NEED_PERMISSION_DIRECTORY': gettext(
-        'You must have {permission} access to this directory'),
-    'NEED_PERMISSION_FILE': gettext(
-        'You must have {permission} access to this file'),
-    'WRONG_GEOM_TYPE': gettext('Geometry type must be one of {allowed}')
-}
-
-def get_message(key):
-    return gettext(MESSAGES[key])
-
-def _evaluate_expression(expression, variable_map):
-    """Evaluate a python expression.
-
-    The expression must be able to be evaluated as a python expression.
-
-    Args:
-        expression (string): A string expression that returns a value.
-        variable_map (dict): A dict mapping string variable names to their
-            python object values.  This is the variable map that will be used
-            when evaluating the expression.
-
-    Returns:
-        Whatever value is returned from evaluating ``expression`` with the
-        variables stored in ``variable_map``.
-
-    """
-    # __builtins__ can be either a dict or a module.  We need its contents as a
-    # dict in order to use ``eval``.
-    if not isinstance(__builtins__, dict):
-        builtins = __builtins__.__dict__
-    else:
-        builtins = __builtins__
-    builtin_symbols = set(builtins.keys())
-
-    active_symbols = set()
-    for tree_node in ast.walk(ast.parse(expression)):
-        if isinstance(tree_node, ast.Name):
-            active_symbols.add(tree_node.id)
-
-    # This should allow any builtin functions, exceptions, etc. to be handled
-    # correctly within an expression.
-    missing_symbols = (active_symbols -
-                       set(variable_map.keys()).union(builtin_symbols))
-    if missing_symbols:
-        raise AssertionError(
-            'Identifiers expected in the expression "%s" are missing: %s' % (
-                expression, ', '.join(missing_symbols)))
-
-    # The usual warnings should go with this call to eval:
-    # Don't run untrusted code!!!
-    return eval(expression, builtins, variable_map)
 
 
 def get_invalid_keys(validation_warnings):
@@ -165,9 +77,6 @@ def load_fields_from_vector(filepath, layer_id=0):
         A list of string fieldnames within the target layer.
 
     """
-    if not os.path.exists(filepath):
-        raise ValueError('File not found: %s' % filepath)
-
     vector = gdal.OpenEx(filepath, gdal.OF_VECTOR)
     layer = vector.GetLayer(layer_id)
     fieldnames = [defn.GetName() for defn in layer.schema]
@@ -198,6 +107,7 @@ def check_spatial_overlap(spatial_filepaths_list,
     bounding_boxes = []
     checked_file_list = []
     for filepath in spatial_filepaths_list:
+        filepath = utils._GDALPath.from_uri(filepath).to_normalized_path()
         try:
             info = pygeoprocessing.get_raster_info(filepath)
         except (ValueError, RuntimeError):
@@ -208,7 +118,7 @@ def check_spatial_overlap(spatial_filepaths_list,
             info = pygeoprocessing.get_vector_info(filepath)
 
         if info['projection_wkt'] is None:
-            return get_message('NO_PROJECTION').format(filepath=filepath)
+            return validation_messages.NO_PROJECTION.format(filepath=filepath)
 
         if different_projections_ok:
             try:
@@ -238,7 +148,7 @@ def check_spatial_overlap(spatial_filepaths_list,
     except ValueError as error:
         LOGGER.debug(error)
         formatted_lists = _format_bbox_list(checked_file_list, bounding_boxes)
-        return get_message('BBOX_NOT_INTERSECT').format(bboxes=formatted_lists)
+        return validation_messages.BBOX_NOT_INTERSECT.format(bboxes=formatted_lists)
     return None
 
 
@@ -279,7 +189,7 @@ def validate(args, model_spec):
         required = parameter_spec.required
 
         if isinstance(required, str):
-            required = bool(_evaluate_expression(
+            required = bool(utils.evaluate_expression(
                 expression=f'{parameter_spec.required}',
                 variable_map=expression_values))
 
@@ -296,11 +206,11 @@ def validate(args, model_spec):
 
     if missing_keys:
         validation_warnings.append(
-            (sorted(missing_keys), get_message('MISSING_KEY')))
+            (sorted(missing_keys), validation_messages.MISSING_KEY))
 
     if required_keys_with_no_value:
         validation_warnings.append(
-            (sorted(required_keys_with_no_value), get_message('MISSING_VALUE')))
+            (sorted(required_keys_with_no_value), validation_messages.MISSING_VALUE))
 
     # Phase 2: Check whether any input with a value validates with its
     # type-specific check function.
@@ -327,18 +237,16 @@ def validate(args, model_spec):
                 for nested_spec in getattr(parameter_spec, axis_key):
                     if (isinstance(nested_spec.required, str)):
                         nested_spec.required = (
-                            bool(_evaluate_expression(
+                            bool(utils.evaluate_expression(
                                 nested_spec.required, expression_values)))
         try:
-            # pass the entire arg spec into the validation function as kwargs
-            # each type validation function allows extra kwargs with **kwargs
             warning_msg = parameter_spec.validate(args[key])
             if warning_msg:
                 validation_warnings.append(([key], warning_msg))
                 invalid_keys.add(key)
         except Exception:
             LOGGER.exception(f'Error when validating key {key} with value {args[key]}')
-            validation_warnings.append(([key], get_message('UNEXPECTED_ERROR')))
+            validation_warnings.append(([key], validation_messages.UNEXPECTED_ERROR))
 
     # Phase 3: Check spatial overlap if applicable
     if model_spec.validate_spatial_overlap:
@@ -481,7 +389,7 @@ def args_enabled(args, model_spec):
         arg_spec.id: args.get(arg_spec.id, False) for arg_spec in model_spec.inputs}
     for arg_spec in model_spec.inputs:
         if isinstance(arg_spec.allowed, str):
-            enabled[arg_spec.id] = bool(_evaluate_expression(
+            enabled[arg_spec.id] = bool(utils.evaluate_expression(
                 arg_spec.allowed, expression_values))
         else:
             enabled[arg_spec.id] = True

@@ -218,26 +218,6 @@ class UFRMTests(unittest.TestCase):
             f'{[16, 17, 18, 21]}')
         self.assertEqual(expected_message, actual_message)
 
-    def test_ufrm_explicit_zeros_in_table(self):
-        """UFRM: assert no exception on row of all zeros."""
-        import pandas
-        from natcap.invest import urban_flood_risk_mitigation
-        args = self._make_args()
-
-        good_cn_table_path = os.path.join(
-            self.workspace_dir, 'good_cn_table.csv')
-        cn_table = pandas.read_csv(args['curve_number_table_path'])
-
-        # a user may define a row with all 0s
-        cn_table.iloc[0] = [0] * cn_table.shape[1]
-        cn_table.to_csv(good_cn_table_path, index=False)
-        args['curve_number_table_path'] = good_cn_table_path
-
-        try:
-            urban_flood_risk_mitigation.execute(args)
-        except ValueError:
-            self.fail('unexpected ValueError when testing curve number row with all zeros')
-
     def test_ufrm_string_damage_to_infrastructure(self):
         """UFRM: handle str(int) structure indices.
 
@@ -315,11 +295,30 @@ class UFRMTests(unittest.TestCase):
         # area.
         self.assertEqual(len(aoi_damage_dict), 1)
         numpy.testing.assert_allclose(aoi_damage_dict[0], 5645.787282992962)
+    
+    def test_ufrm_smax(self):
+        """UFRM: test _s_max operation."""
+        from natcap.invest import urban_flood_risk_mitigation
+        
+        cn_nodata = -1
+        result_nodata = -9999
+        # These varying percent slope values should cover all of the slope
+        # factor and slope table cases.
+        cn_array = numpy.array(
+            [[100, 0, 65, 90, 30, cn_nodata]], dtype=numpy.float32)
+
+        smax_result = urban_flood_risk_mitigation._s_max_op(
+            cn_array, cn_nodata, result_nodata)
+
+        smax_expected = numpy.array(
+            [[0.0, 100000, 136.769, 28.222, 592.667, result_nodata]],
+            dtype=numpy.float32)
+        numpy.testing.assert_allclose(smax_result, smax_expected, rtol=1e-5)
 
     def test_validate(self):
         """UFRM: test validate function."""
         from natcap.invest import urban_flood_risk_mitigation
-        from natcap.invest import validation
+        from natcap.invest import validation_messages
         args = self._make_args()
         validation_warnings = urban_flood_risk_mitigation.validate(args)
         self.assertEqual(len(validation_warnings), 0)
@@ -331,26 +330,26 @@ class UFRMTests(unittest.TestCase):
         args['workspace_dir'] = ''
         result = urban_flood_risk_mitigation.validate(args)
         self.assertEqual(
-            result, [(['workspace_dir'], validation.MESSAGES['MISSING_VALUE'])])
+            result, [(['workspace_dir'], validation_messages.MISSING_VALUE)])
 
         args = self._make_args()
         args['lulc_path'] = 'fake/path/notfound.tif'
         result = urban_flood_risk_mitigation.validate(args)
         self.assertEqual(
-            result, [(['lulc_path'], validation.MESSAGES['FILE_NOT_FOUND'])])
+            result, [(['lulc_path'], validation_messages.FILE_NOT_FOUND)])
 
         args = self._make_args()
         args['lulc_path'] = args['aoi_watersheds_path']
         result = urban_flood_risk_mitigation.validate(args)
         self.assertEqual(
-            result, [(['lulc_path'], validation.MESSAGES['NOT_GDAL_RASTER'])])
+            result, [(['lulc_path'], validation_messages.NOT_GDAL_RASTER)])
 
         args = self._make_args()
         args['aoi_watersheds_path'] = args['lulc_path']
         result = urban_flood_risk_mitigation.validate(args)
         self.assertEqual(
             result,
-            [(['aoi_watersheds_path'], validation.MESSAGES['NOT_GDAL_VECTOR'])])
+            [(['aoi_watersheds_path'], validation_messages.NOT_GDAL_VECTOR)])
 
         args = self._make_args()
         del args['infrastructure_damage_loss_table_path']
@@ -358,7 +357,7 @@ class UFRMTests(unittest.TestCase):
         self.assertEqual(
             result,
             [(['infrastructure_damage_loss_table_path'],
-                validation.MESSAGES['MISSING_KEY'])])
+                validation_messages.MISSING_KEY)])
 
         args = self._make_args()
         cn_table = pandas.read_csv(args['curve_number_table_path'])
@@ -370,7 +369,7 @@ class UFRMTests(unittest.TestCase):
         self.assertEqual(
             result,
             [(['curve_number_table_path'],
-              validation.MESSAGES['MATCHED_NO_HEADERS'].format(
+              validation_messages.MATCHED_NO_HEADERS.format(
                   header='column', header_name='cn_a'))])
 
         # test missing CN_X values raise warnings
@@ -385,4 +384,4 @@ class UFRMTests(unittest.TestCase):
         self.assertEqual(
             result,
             [(['curve_number_table_path'],
-              'Missing curve numbers for lucode(s) [0]')])
+              'Null value(s) found in column "cn_a"')])

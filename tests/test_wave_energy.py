@@ -407,7 +407,7 @@ class WaveEnergyRegressionTests(unittest.TestCase):
         """Generate an args list that is consistent across regression tests."""
         args = {
             'workspace_dir': workspace_dir,
-            'wave_base_data_path': os.path.join(SAMPLE_DATA, 'WaveData'),
+            'wave_base_data_table': os.path.join(SAMPLE_DATA, 'WaveData', 'wave_data.csv'),
             'analysis_area': 'westcoast',
             'machine_perf_path': os.path.join(
                 SAMPLE_DATA, 'Machine_Pelamis_Performance.csv'),
@@ -621,7 +621,7 @@ class WaveEnergyValidateTests(unittest.TestCase):
         self.base_required_keys = [
             'workspace_dir',
             'machine_param_path',
-            'wave_base_data_path',
+            'wave_base_data_table',
             'analysis_area',
             'machine_perf_path',
             'dem_path',
@@ -653,12 +653,12 @@ class WaveEnergyValidateTests(unittest.TestCase):
 
     def test_incorrect_analysis_area_value(self):
         """WaveEnergy: testing incorrect analysis_area value."""
-        from natcap.invest import wave_energy, validation
+        from natcap.invest import wave_energy, validation_messages
 
         args = {}
         args['analysis_area'] = 'Incorrect Analysis Area'
         validation_error_list = wave_energy.validate(args)
-        expected_message = validation.MESSAGES['INVALID_OPTION'].format(
+        expected_message = validation_messages.INVALID_OPTION.format(
             option_list=sorted([
                 "westcoast", "eastcoast", "northsea4", "northsea10",
                 "australia", "global"]))
@@ -669,13 +669,13 @@ class WaveEnergyValidateTests(unittest.TestCase):
 
     def test_validate_keys_missing_values(self):
         """WaveEnergy: testing validate when keys are missing values."""
-        from natcap.invest import wave_energy, validation
+        from natcap.invest import wave_energy, validation_messages
 
         args = {}
-        args['wave_base_data_path'] = None
+        args['wave_base_data_table'] = None
         args['dem_path'] = None
 
         validation_error_list = wave_energy.validate(args)
         expected_error = (
-            ['dem_path', 'wave_base_data_path'], validation.MESSAGES['MISSING_VALUE'])
+            ['dem_path', 'wave_base_data_table'], validation_messages.MISSING_VALUE)
         self.assertTrue(expected_error in validation_error_list)

@@ -65,7 +65,7 @@ def get_invest_getspec():
     set_locale(request.args.get('language', 'en'))
     target_model = request.get_json()
     target_module = models.model_id_to_pyname[target_model]
-    importlib.reload(natcap.invest.validation)
+    importlib.reload(natcap.invest.validation_messages)
     model_module = importlib.reload(
         importlib.import_module(name=target_module))
     return model_module.MODEL_SPEC.to_json()
@@ -120,7 +120,7 @@ def get_invest_validate():
         limit_to = None
 
     set_locale(request.args.get('language', 'en'))
-    importlib.reload(natcap.invest.validation)
+    importlib.reload(natcap.invest.validation_messages)
     model_module = importlib.reload(
         importlib.import_module(
             name=models.model_id_to_pyname[payload['model_id']]))
@@ -170,8 +170,7 @@ def post_datastack_file():
     result_dict = {
         'type': stack_type,
         'args': stack_info.args,
-        'model_id': stack_info.model_id,
-        'invest_version': stack_info.invest_version
+        'model_id': stack_info.model_id
     }
     return json.dumps(result_dict)
 
