@@ -12,7 +12,7 @@ import {
   createJupyterProcess,
   shutdownPythonProcess,
 } from './createPythonFlaskProcess';
-import setupContextMenu from './setupContextMenu';
+import contextMenu from 'electron-context-menu';
 import { ipcMainChannels } from './ipcMainChannels';
 
 function createWindow(parentWindow, isDevMode) {
@@ -29,7 +29,8 @@ function createWindow(parentWindow, isDevMode) {
       additionalArguments: [devModeArg],
     },
   });
-  setupContextMenu(win);
+  contextMenu({
+    window: win});
   win.setMenu(null);
   if (isDevMode) {
     win.webContents.openDevTools();
