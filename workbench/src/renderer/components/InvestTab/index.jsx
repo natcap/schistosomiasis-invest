@@ -25,10 +25,6 @@ import { ipcMainChannels } from '../../../main/ipcMainChannels';
 const { ipcRenderer } = window.Workbench.electron;
 const { logger } = window.Workbench;
 
-function handleSchistoResults(logfile, modelID) {
-  logger.debug('Viewing results');
-  ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
-}
 
 /**
  * Render an invest model setup form, log display, etc.
@@ -56,6 +52,7 @@ class InvestTab extends React.Component {
     this.handleOpenWorkspace = this.handleOpenWorkspace.bind(this);
     this.showErrorModal = this.showErrorModal.bind(this);
     this.handleViewResults = this.handleViewResults.bind(this);
+    this.handleSchistoResults = this.handleSchistoResults.bind(this);
   }
 
   async componentDidMount() {
@@ -206,6 +203,11 @@ class InvestTab extends React.Component {
     ipcRenderer.send(ipcMainChannels.OPEN_LOCAL_HTML, filepath, true);
   }
 
+  async handleSchistoResults(logfile, modelID) {
+    logger.debug('Viewing results');
+    ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
+  }
+
   showErrorModal(shouldShow) {
     this.setState({
       showErrorModal: shouldShow,
@@ -300,12 +302,15 @@ class InvestTab extends React.Component {
                     ? (
                       <ModelStatusAlert
                         status={status}
-                        hasReport={Boolean(htmlfile) || modelID=='schistosomiasis'}
+                        hasReport={
+			  Boolean(htmlfile) || modelID.startsWith('schisto')
+			}
                         handleOpenWorkspace={() => this.handleOpenWorkspace(
                           argsValues?.workspace_dir
                         )}
                         handleViewResults={
-				(modelID=='schistosomiasis' ? handleSchistoResults(logfile, modelID) : () => this.handleViewResults(htmlfile)}
+			  () => (modelID.startsWith('schisto') ? this.handleSchistoResults(logfile, modelID) : this.handleViewResults(htmlfile)
+			)}
                         terminateInvestProcess={this.terminateInvestProcess}
                       />
                     )

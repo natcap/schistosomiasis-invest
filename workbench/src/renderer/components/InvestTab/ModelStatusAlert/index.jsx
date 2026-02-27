@@ -68,7 +68,6 @@ export default function ModelStatusAlert(props) {
       {alertMessage}
       {hasReport ? ResultsButton : null}
       {WorkspaceButton}
-      {ResultsButton}
     </Alert>
   );
 }
