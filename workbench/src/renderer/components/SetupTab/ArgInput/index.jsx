@@ -183,8 +183,6 @@ export function ArgInput(props) {
 
   const inputId = `${argkey}-${uniqueId}`;
   // Custom schisto UI table form functionality
-  const { t } = useTranslation();
-
   const initFormTableValues = {};
   if (formTable) {
     Object.keys(argSpec.columns).forEach((colName) => {
