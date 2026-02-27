@@ -25,7 +25,7 @@ import { ipcMainChannels } from '../../../main/ipcMainChannels';
 const { ipcRenderer } = window.Workbench.electron;
 const { logger } = window.Workbench;
 
-function handleViewResults(logfile, modelID) {
+function handleSchistoResults(logfile, modelID) {
   logger.debug('Viewing results');
   ipcRenderer.send(ipcMainChannels.OPEN_JUPYTER, logfile, modelID);
 }
@@ -55,6 +55,7 @@ class InvestTab extends React.Component {
     this.investExitCallback = this.investExitCallback.bind(this);
     this.handleOpenWorkspace = this.handleOpenWorkspace.bind(this);
     this.showErrorModal = this.showErrorModal.bind(this);
+    this.handleViewResults = this.handleViewResults.bind(this);
   }
 
   async componentDidMount() {
@@ -126,6 +127,7 @@ class InvestTab extends React.Component {
     const saveJob = true;
     updateJobProperties(tabID, {
       status: status,
+      htmlfile: data.htmlfile,
     }, saveJob);
     this.setState({
       executeClicked: false,
@@ -200,6 +202,10 @@ class InvestTab extends React.Component {
     }
   }
 
+  async handleViewResults(filepath) {
+    ipcRenderer.send(ipcMainChannels.OPEN_LOCAL_HTML, filepath, true);
+  }
+
   showErrorModal(shouldShow) {
     this.setState({
       showErrorModal: shouldShow,
@@ -220,6 +226,7 @@ class InvestTab extends React.Component {
       modelID,
       argsValues,
       logfile,
+      htmlfile,
     } = this.props.job;
 
     const { tabID, investList, t } = this.props;
@@ -293,8 +300,12 @@ class InvestTab extends React.Component {
                     ? (
                       <ModelStatusAlert
                         status={status}
-                        handleOpenWorkspace={() => this.handleOpenWorkspace(argsValues?.workspace_dir)}
-                        handleViewResults={() => handleViewResults(logfile, modelID)}
+                        hasReport={Boolean(htmlfile) || modelID=='schistosomiasis'}
+                        handleOpenWorkspace={() => this.handleOpenWorkspace(
+                          argsValues?.workspace_dir
+                        )}
+                        handleViewResults={
+				(modelID=='schistosomiasis' ? handleSchistoResults(logfile, modelID) : () => this.handleViewResults(htmlfile)}
                         terminateInvestProcess={this.terminateInvestProcess}
                       />
                     )
@@ -358,6 +369,7 @@ InvestTab.propTypes = {
     modelID: PropTypes.string.isRequired,
     argsValues: PropTypes.object,
     logfile: PropTypes.string,
+    htmlfile: PropTypes.string,
     status: PropTypes.string,
     type: PropTypes.string,
   }).isRequired,

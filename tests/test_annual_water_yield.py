@@ -11,6 +11,8 @@ import pandas
 import pygeoprocessing
 from osgeo import gdal, ogr, osr
 
+from .utils import assert_complete_execute
+
 REGRESSION_DATA = os.path.join(
     os.path.dirname(__file__), '..', 'data', 'invest-test-data', 'annual_water_yield')
 SAMPLE_DATA = os.path.join(REGRESSION_DATA, 'input')
@@ -170,7 +172,13 @@ class AnnualWaterYieldTests(unittest.TestCase):
         args['sub_watersheds_path'] = os.path.join(
             SAMPLE_DATA, 'subwatersheds.shp')
         args['results_suffix'] = 'test'
-        annual_water_yield.execute(args)
+        execute_kwargs = {
+            'generate_report': bool(annual_water_yield.MODEL_SPEC.reporter),
+            'save_file_registry': True
+        }
+        annual_water_yield.MODEL_SPEC.execute(args, **execute_kwargs)
+        assert_complete_execute(
+            args, annual_water_yield.MODEL_SPEC, **execute_kwargs)
 
         raster_results = ['aet_test.tif', 'fractp_test.tif', 'wyield_test.tif']
         for raster_path in raster_results:
@@ -418,7 +426,7 @@ class AnnualWaterYieldTests(unittest.TestCase):
 
     def test_fractp_op(self):
         """Test `fractp_op`"""
-        from natcap.invest.annual_water_yield import fractp_op
+        from natcap.invest.annual_water_yield.annual_water_yield import fractp_op
 
         # generate fake data
         kc = numpy.array([[1, .1, .1], [.6, .6, .1]])
@@ -446,7 +454,7 @@ class AnnualWaterYieldTests(unittest.TestCase):
     def test_compute_watershed_valuation(self):
         """Test `compute_watershed_valuation`, `compute_rsupply_volume`
         and `compute_water_yield_volume`"""
-        from natcap.invest import annual_water_yield
+        from natcap.invest.annual_water_yield import annual_water_yield
 
         def _create_watershed_results_vector(path_to_shp):
             """Generate a fake watershed results vector file."""

@@ -9,16 +9,14 @@ import pygeoprocessing.routing
 import shapely.errors
 import shapely.geometry
 import shapely.wkb
-import taskgraph
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
 
-from .. import gettext
-from .. import spec
-from .. import utils
-from .. import validation
-from ..unit_registry import u
+from natcap.invest import gettext
+from natcap.invest import spec
+from natcap.invest import validation
+from natcap.invest.unit_registry import u
 from . import delineateit_core
 
 LOGGER = logging.getLogger(__name__)
@@ -172,6 +170,7 @@ MODEL_SPEC = spec.ModelSpec(
             id="pour_points",
             path="pour_points.gpkg",
             about=gettext("Points where water flows off the defined area of the map."),
+            created_if="detect_pour_points",
             geometry_types={"POINT"},
             fields=[]
         ),

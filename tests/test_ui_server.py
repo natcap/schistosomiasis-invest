@@ -44,8 +44,8 @@ class EndpointFunctionTests(unittest.TestCase):
         spec = json.loads(response.get_data(as_text=True))
         self.assertEqual(
             set(spec),
-            {'model_id', 'model_title', 'userguide', 'aliases',
-             'input_field_order', 'different_projections_ok',
+            {'model_id', 'model_title', 'userguide', 'aliases', 'reporter',
+             'about', 'input_field_order', 'different_projections_ok',
              'validate_spatial_overlap', 'args', 'outputs', 'module_name'})
 
     def test_get_invest_validate(self):
@@ -232,7 +232,7 @@ class EndpointFunctionTests(unittest.TestCase):
         self.assertEqual(mock_post.call_args.args[0], mock_url)
         self.assertEqual(
             mock_post.call_args.kwargs['data']['model_name'],
-            'natcap.invest.carbon')
+            'natcap.invest.carbon.carbon')
         self.assertEqual(
             mock_post.call_args.kwargs['data']['invest_interface'],
             payload['invest_interface'])

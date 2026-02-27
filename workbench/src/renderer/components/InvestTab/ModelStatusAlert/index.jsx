@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 /* Render different Alert contents depending on an InVEST run status */
 export default function ModelStatusAlert(props) {
-  const { status } = props;
+  const { status, hasReport } = props;
   const { t, i18n } = useTranslation();
 
   const ResultsButton = (
@@ -66,6 +66,7 @@ export default function ModelStatusAlert(props) {
       variant={alertVariant}
     >
       {alertMessage}
+      {hasReport ? ResultsButton : null}
       {WorkspaceButton}
       {ResultsButton}
     </Alert>
@@ -76,6 +77,7 @@ ModelStatusAlert.propTypes = {
   status: PropTypes.oneOf(
     ['running', 'error', 'success', 'canceled']
   ).isRequired,
+  hasReport: PropTypes.bool.isRequired,
   terminateInvestProcess: PropTypes.func.isRequired,
   handleOpenWorkspace: PropTypes.func.isRequired,
 };

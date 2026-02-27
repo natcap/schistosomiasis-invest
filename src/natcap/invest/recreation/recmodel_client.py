@@ -22,18 +22,14 @@ import shapely
 import shapely.geometry
 import shapely.prepared
 import shapely.wkt
-import taskgraph
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr
 
-# prefer to do intrapackage imports to avoid case where global package is
-# installed and we import the global version of it rather than the local
-from .. import gettext
-from .. import spec
-from .. import utils
-from .. import validation
-from ..unit_registry import u
+from natcap.invest import gettext
+from natcap.invest import spec
+from natcap.invest import validation
+from natcap.invest.unit_registry import u
 
 LOGGER = logging.getLogger(__name__)
 
@@ -439,13 +435,6 @@ MODEL_SPEC = spec.ModelSpec(
             path="intermediate/response_polygons_lookup.pickle",
             about=gettext(
                 "Pickled dictionary mapping FIDs to shapely geometries"
-            )
-        ),
-        spec.FileOutput(
-            id="scenario_[PREDICTOR]",
-            path="intermediate/scenario/[PREDICTOR].json",
-            about=gettext(
-                "aggregated scenario predictor values within each polygon"
             )
         ),
         spec.FileOutput(
